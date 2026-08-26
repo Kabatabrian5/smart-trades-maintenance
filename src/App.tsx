@@ -84,6 +84,7 @@ const TRADE_MODES: Array<{ id: TradeMode; label: string }> = [
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
+
 const DERIV_CLIENT_ID = import.meta.env.VITE_DERIV_CLIENT_ID || '34bIcDF1RsEKSAbKFKimH';
 
 function toBase64Url(bytes: Uint8Array) {
@@ -137,37 +138,61 @@ export default function App() {
   });
   const [accountBalances, setAccountBalances] = useState<AccountBalances>({ real: null, demo: null, currency: 'USD' });
   const [authStatus, setAuthStatus] = useState<'idle' | 'authorizing' | 'failed'>('idle');
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const legacyToken = params.get('token1');
     const legacyLoginid = params.get('acct1');
     const legacyCurrency = params.get('cur1') || 'USD';
+    const accounts = Array.from({ length: 20 }, (_, index) => {
+      const accountNumber = index + 1;
+      const token = params.get(`token${accountNumber}`);
+      const loginid = params.get(`acct${accountNumber}`);
+      if (!token || !loginid) return null;
+      return { token, loginid, currency: params.get(`cur${accountNumber}`) || 'USD' };
+    }).filter((item): item is { token: string; loginid: string; currency: string } => item !== null);
+
+    if (legacyToken && legacyLoginid && !accounts.length) {
+      accounts.push({ token: legacyToken, loginid: legacyLoginid, currency: legacyCurrency });
+    }
+
+    if (accounts.length) {
+      void authorizeAccount(accounts[0].token, accounts[0].loginid, accounts[0].currency).catch((error: unknown) => {
+        setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed');
+        setAuthStatus('failed');
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+    if (params.get('error')) {
+      setAuthError(params.get('error_description') || params.get('error') || 'Deriv authorization was denied');
+      setAuthStatus('failed');
+      return;
+    }
     const code = params.get('code');
     const returnedState = params.get('state');
     const expectedState = sessionStorage.getItem('deriv_oauth_state');
-
-    if (legacyToken && legacyLoginid) {
-      void authorizeAccount(legacyToken, legacyLoginid, legacyCurrency);
-      return;
-    }
     if (!code || !returnedState || returnedState !== expectedState) {
-      if (params.get('error')) setAuthStatus('failed');
       return;
     }
 
     let isMounted = true;
     setAuthStatus('authorizing');
     fetch('/api/deriv-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, code_verifier: sessionStorage.getItem('deriv_pkce_verifier'), redirect_uri: window.location.origin }) }).then(async (response) => {
-      if (!response.ok) throw new Error('Token exchange failed');
-      const tokenResponse = await response.json() as { access_token?: string; loginid?: string; currency?: string };
-      if (!tokenResponse.access_token) throw new Error('No Deriv access token returned');
-      await authorizeAccount(tokenResponse.access_token, tokenResponse.loginid || 'Deriv account', tokenResponse.currency || 'USD');
+      const errorResponse = await response.clone().json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(errorResponse.error || `Token exchange failed (${response.status})`);
+      const tokenResponse = await response.json() as { token1?: string; acct1?: string; cur1?: string };
+      if (!tokenResponse.token1 || !tokenResponse.acct1) throw new Error('Deriv did not return an account session token');
+      await authorizeAccount(tokenResponse.token1, tokenResponse.acct1, tokenResponse.cur1 || 'USD');
       sessionStorage.removeItem('deriv_pkce_verifier');
       sessionStorage.removeItem('deriv_oauth_state');
       window.history.replaceState({}, document.title, window.location.pathname);
-    }).catch(() => {
-      if (isMounted) setAuthStatus('failed');
+    }).catch((error: unknown) => {
+      if (isMounted) {
+        setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed');
+        setAuthStatus('failed');
+      }
     });
 
     return () => {
@@ -177,7 +202,9 @@ export default function App() {
 
   async function authorizeAccount(token: string, loginid: string, currency: string) {
     const response = await derivService.authorize(token);
-    if (response?.error) throw response.error;
+    if (response?.error) {
+      throw new Error(response.error.message || response.error.code || 'Deriv WebSocket authorization failed');
+    }
     const nextAccount: DerivAccount = { loginid, token, currency, balance: null };
     sessionStorage.setItem('smart-trades-account', JSON.stringify(nextAccount));
     setAccount(nextAccount);
@@ -567,8 +594,8 @@ export default function App() {
           {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
           {account && <button onClick={() => setIsCashierOpen(true)} className="px-2.5 sm:px-4 py-2 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer">Cashier</button>}
           <button className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">☀️ <span className="hidden sm:inline">Light</span></button>
-          {account ? <span className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}</span> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch { setAuthStatus('failed'); } }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
-          {!account && <a href="https://home.deriv.com/dashboard/signup?sidc=4A379AC6-1A77-4D13-8C58-C50A7A773543&lang=&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU254055&gad_source=1&gad_campaignid=23712486145&gbraid=0AAAABC-zKEldZ7l_rrVHwM1ZmzHzCmpiJ&gclid=EAIaIQobChMIhLK3tuW9lgMVxa-DBx1OGgyXEAAYASAAEgJ4K_D_BwE&residence=ke" target="_blank" rel="noreferrer" className="rounded-xl bg-teal-400 px-2.5 py-2 text-[10px] font-extrabold text-[#071217] transition hover:bg-teal-300 sm:px-4 sm:text-xs">Sign up</a>}
+          {account ? <span className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}</span> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
+          {!account && <a href="https://home.deriv.com/dashboard/signup?_gl=1*4zo6tf*_gcl_au*MTM1MjEzODExOS4xNzg3NzcxMjUx&residence=ke" target="_blank" rel="noreferrer" className="rounded-xl bg-teal-400 px-2.5 py-2 text-[10px] font-extrabold text-[#071217] transition hover:bg-teal-300 sm:px-4 sm:text-xs">Sign up</a>}
         </div>
       </header>
 
@@ -1257,7 +1284,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {authStatus === 'failed' && <div className="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-xl border border-rose-500/40 bg-[#29151b] px-4 py-3 text-xs text-rose-200 shadow-xl">Deriv login could not be completed. Please try again.</div>}
+      {authStatus === 'failed' && <div className="fixed bottom-16 left-1/2 z-40 max-w-[min(90vw,32rem)] -translate-x-1/2 rounded-xl border border-rose-500/40 bg-[#29151b] px-4 py-3 text-xs text-rose-200 shadow-xl">Deriv login could not be completed: {authError || 'Please try again.'}</div>}
       {isCashierOpen && account && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setIsCashierOpen(false)}>
           <section className="w-full max-w-md rounded-2xl border border-[#30303d] bg-[#17171f] p-6 text-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cashier-title" onClick={(event) => event.stopPropagation()}>

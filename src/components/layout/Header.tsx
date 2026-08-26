@@ -82,13 +82,13 @@ export default function Header({ currentTab, setCurrentTab }: HeaderProps) {
           <span>Cashier</span>
         </button>
 
-        <button className="px-4 py-2 bg-[#1b1b24] hover:bg-[#252533] border border-[#2e2e3d] text-gray-200 rounded-xl text-xs font-bold transition-all cursor-pointer">
+        <a href="https://smart-trades.site" className="px-4 py-2 bg-[#1b1b24] hover:bg-[#252533] border border-[#2e2e3d] text-gray-200 rounded-xl text-xs font-bold transition-all cursor-pointer">
           Sign in
-        </button>
+        </a>
 
-        <button className="px-5 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-red-600/30 cursor-pointer">
+        <a href="https://home.deriv.com/dashboard/signup?_gl=1*4zo6tf*_gcl_au*MTM1MjEzODExOS4xNzg3NzcxMjUx&residence=ke" className="px-5 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-red-600/30 cursor-pointer">
           Sign up
-        </button>
+        </a>
       </div>
     </header>
   );
