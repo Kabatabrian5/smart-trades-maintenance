@@ -84,15 +84,15 @@ const TRADE_MODES: Array<{ id: TradeMode; label: string }> = [
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
-const DERIV_APP_ID = import.meta.env.VITE_DERIV_APP_ID || '34bIcDF1RsEKSAbKFKimH';
-const DERIV_CLIENT_ID = import.meta.env.VITE_DERIV_CLIENT_ID || DERIV_APP_ID;
+const DERIV_CLIENT_ID = import.meta.env.VITE_DERIV_CLIENT_ID as string | undefined;
 
 function toBase64Url(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 async function derivOAuthUrl() {
-  const redirectUri = `${window.location.origin}${window.location.pathname}`;
+  if (!DERIV_CLIENT_ID) throw new Error('Deriv OAuth client ID is not configured');
+  const redirectUri = window.location.origin;
   const verifier = toBase64Url(crypto.getRandomValues(new Uint8Array(64)));
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   const challenge = toBase64Url(new Uint8Array(digest));
@@ -102,7 +102,6 @@ async function derivOAuthUrl() {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: DERIV_CLIENT_ID,
-    app_id: DERIV_APP_ID,
     scope: 'trade account_manage payment',
     redirect_uri: redirectUri,
     state,
@@ -159,7 +158,7 @@ export default function App() {
 
     let isMounted = true;
     setAuthStatus('authorizing');
-    fetch('/api/deriv-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, code_verifier: sessionStorage.getItem('deriv_pkce_verifier'), redirect_uri: `${window.location.origin}${window.location.pathname}` }) }).then(async (response) => {
+    fetch('/api/deriv-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, code_verifier: sessionStorage.getItem('deriv_pkce_verifier'), redirect_uri: window.location.origin }) }).then(async (response) => {
       if (!response.ok) throw new Error('Token exchange failed');
       const tokenResponse = await response.json() as { access_token?: string; loginid?: string; currency?: string };
       if (!tokenResponse.access_token) throw new Error('No Deriv access token returned');
@@ -568,7 +567,7 @@ export default function App() {
           {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
           {account && <button onClick={() => setIsCashierOpen(true)} className="px-2.5 sm:px-4 py-2 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer">Cashier</button>}
           <button className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">☀️ <span className="hidden sm:inline">Light</span></button>
-          {account ? <span className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}</span> : <button onClick={async () => { window.location.href = await derivOAuthUrl(); }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
+          {account ? <span className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}</span> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch { setAuthStatus('failed'); } }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
           {!account && <a href="https://home.deriv.com/dashboard/signup?sidc=4A379AC6-1A77-4D13-8C58-C50A7A773543&lang=&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU254055&gad_source=1&gad_campaignid=23712486145&gbraid=0AAAABC-zKEldZ7l_rrVHwM1ZmzHzCmpiJ&gclid=EAIaIQobChMIhLK3tuW9lgMVxa-DBx1OGgyXEAAYASAAEgJ4K_D_BwE&residence=ke" target="_blank" rel="noreferrer" className="rounded-xl bg-teal-400 px-2.5 py-2 text-[10px] font-extrabold text-[#071217] transition hover:bg-teal-300 sm:px-4 sm:text-xs">Sign up</a>}
         </div>
       </header>
