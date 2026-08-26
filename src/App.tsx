@@ -180,8 +180,11 @@ export default function App() {
     let isMounted = true;
     setAuthStatus('authorizing');
     fetch('/api/deriv-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, code_verifier: sessionStorage.getItem('deriv_pkce_verifier'), redirect_uri: window.location.origin }) }).then(async (response) => {
-      const errorResponse = await response.clone().json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(errorResponse.error || `Token exchange failed (${response.status})`);
+      const errorResponse = await response.clone().json().catch(() => ({})) as { error?: string; response_keys?: string[]; deriv_error?: string };
+      if (!response.ok) {
+        const details = errorResponse.deriv_error || (errorResponse.response_keys?.length ? `response fields: ${errorResponse.response_keys.join(', ')}` : '');
+        throw new Error([errorResponse.error || `Token exchange failed (${response.status})`, details].filter(Boolean).join(' - '));
+      }
       const tokenResponse = await response.json() as { token1?: string; acct1?: string; cur1?: string };
       if (!tokenResponse.token1 || !tokenResponse.acct1) throw new Error('Deriv did not return an account session token');
       await authorizeAccount(tokenResponse.token1, tokenResponse.acct1, tokenResponse.cur1 || 'USD');

@@ -70,6 +70,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return response.status(502).json({
         error: 'Deriv returned an unusable account session response',
         response_keys: Object.keys(legacyData),
+        deriv_error: typeof legacyData.error === 'string' ? legacyData.error : legacyData.error?.message,
       });
     }
     return response.status(200).json(legacyTokens);
