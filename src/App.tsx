@@ -57,6 +57,12 @@ interface DerivAccount {
   balance: number | null;
 }
 
+interface AccountBalances {
+  real: number | null;
+  demo: number | null;
+  currency: string;
+}
+
 interface Position {
   id: string;
   symbol: string;
@@ -78,6 +84,34 @@ const TRADE_MODES: Array<{ id: TradeMode; label: string }> = [
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
+const DERIV_APP_ID = import.meta.env.VITE_DERIV_APP_ID || '34bIcDF1RsEKSAbKFKimH';
+const DERIV_CLIENT_ID = import.meta.env.VITE_DERIV_CLIENT_ID || DERIV_APP_ID;
+
+function toBase64Url(bytes: Uint8Array) {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function derivOAuthUrl() {
+  const redirectUri = `${window.location.origin}${window.location.pathname}`;
+  const verifier = toBase64Url(crypto.getRandomValues(new Uint8Array(64)));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = toBase64Url(new Uint8Array(digest));
+  const state = toBase64Url(crypto.getRandomValues(new Uint8Array(24)));
+  sessionStorage.setItem('deriv_pkce_verifier', verifier);
+  sessionStorage.setItem('deriv_oauth_state', state);
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: DERIV_CLIENT_ID,
+    app_id: DERIV_APP_ID,
+    scope: 'trade account_manage payment',
+    redirect_uri: redirectUri,
+    state,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+  });
+  return `https://auth.deriv.com/oauth2/auth?${params.toString()}`;
+}
+
 function playSignalBeep() {
   const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextClass) return;
@@ -102,25 +136,36 @@ export default function App() {
     const savedAccount = sessionStorage.getItem('smart-trades-account');
     return savedAccount ? JSON.parse(savedAccount) as DerivAccount : null;
   });
+  const [accountBalances, setAccountBalances] = useState<AccountBalances>({ real: null, demo: null, currency: 'USD' });
   const [authStatus, setAuthStatus] = useState<'idle' | 'authorizing' | 'failed'>('idle');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token1');
-    const loginid = params.get('acct1');
-    const currency = params.get('cur1') || 'USD';
+    const legacyToken = params.get('token1');
+    const legacyLoginid = params.get('acct1');
+    const legacyCurrency = params.get('cur1') || 'USD';
+    const code = params.get('code');
+    const returnedState = params.get('state');
+    const expectedState = sessionStorage.getItem('deriv_oauth_state');
 
-    if (!token || !loginid) return;
+    if (legacyToken && legacyLoginid) {
+      void authorizeAccount(legacyToken, legacyLoginid, legacyCurrency);
+      return;
+    }
+    if (!code || !returnedState || returnedState !== expectedState) {
+      if (params.get('error')) setAuthStatus('failed');
+      return;
+    }
 
     let isMounted = true;
     setAuthStatus('authorizing');
-    derivService.authorize(token).then((response) => {
-      if (!isMounted || response?.error) throw response?.error || new Error('Deriv authorization failed');
-
-      const nextAccount: DerivAccount = { loginid, token, currency, balance: null };
-      sessionStorage.setItem('smart-trades-account', JSON.stringify(nextAccount));
-      setAccount(nextAccount);
-      setAuthStatus('idle');
+    fetch('/api/deriv-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, code_verifier: sessionStorage.getItem('deriv_pkce_verifier'), redirect_uri: `${window.location.origin}${window.location.pathname}` }) }).then(async (response) => {
+      if (!response.ok) throw new Error('Token exchange failed');
+      const tokenResponse = await response.json() as { access_token?: string; loginid?: string; currency?: string };
+      if (!tokenResponse.access_token) throw new Error('No Deriv access token returned');
+      await authorizeAccount(tokenResponse.access_token, tokenResponse.loginid || 'Deriv account', tokenResponse.currency || 'USD');
+      sessionStorage.removeItem('deriv_pkce_verifier');
+      sessionStorage.removeItem('deriv_oauth_state');
       window.history.replaceState({}, document.title, window.location.pathname);
     }).catch(() => {
       if (isMounted) setAuthStatus('failed');
@@ -131,11 +176,22 @@ export default function App() {
     };
   }, []);
 
+  async function authorizeAccount(token: string, loginid: string, currency: string) {
+    const response = await derivService.authorize(token);
+    if (response?.error) throw response.error;
+    const nextAccount: DerivAccount = { loginid, token, currency, balance: null };
+    sessionStorage.setItem('smart-trades-account', JSON.stringify(nextAccount));
+    setAccount(nextAccount);
+    setAuthStatus('idle');
+  }
+
   useEffect(() => {
     if (!account) return;
 
-    const unsubscribeBalance = derivService.subscribe('balance', (data: { balance?: { balance?: number } }) => {
+    const unsubscribeBalance = derivService.subscribe('balance', (data: { balance?: { balance?: number; loginid?: string; currency?: string } }) => {
       if (typeof data.balance?.balance !== 'number') return;
+      const isDemo = data.balance.loginid?.startsWith('VR') || account.loginid.startsWith('VR');
+      setAccountBalances((previous) => ({ ...previous, [isDemo ? 'demo' : 'real']: data.balance?.balance ?? null, currency: data.balance?.currency || previous.currency }));
       setAccount((previous) => {
         if (!previous) return previous;
         const updated = { ...previous, balance: data.balance?.balance ?? null };
@@ -171,7 +227,10 @@ export default function App() {
   const [tradeMode, setTradeMode] = useState<TradeMode>('MATCHES_DIFFERS');
   const [stake, setStake] = useState(10);
   const [ticksCount, setTicksCount] = useState(1);
-  const [positions, setPositions] = useState<Position[]>([]);
+  const [positions, setPositions] = useState<Position[]>(() => {
+    const savedPositions = sessionStorage.getItem('smart-trades-positions');
+    return savedPositions ? JSON.parse(savedPositions) as Position[] : [];
+  });
   const [signalMarket, setSignalMarket] = useState('1HZ100V');
   const [signalDigitStats, setSignalDigitStats] = useState(digitStatsPlaceholder());
   const [isSearchingSignals, setIsSearchingSignals] = useState(false);
@@ -464,6 +523,7 @@ export default function App() {
           stake,
           status: 'Open',
         }, ...current]);
+        sessionStorage.setItem('smart-trades-positions', JSON.stringify([{ id: String(buyRes.buy.contract_id), symbol: selectedSymbol, contract: contractType, stake, status: 'Open' }, ...positions]));
         alert(`Digit Trade executed! Contract ID: ${buyRes.buy.contract_id}`);
       }
     } catch (error: any) {
@@ -505,9 +565,10 @@ export default function App() {
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          {account && <button onClick={() => setIsCashierOpen(true)} className="hidden sm:block px-2.5 sm:px-4 py-2 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer">Cashier</button>}
+          {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
+          {account && <button onClick={() => setIsCashierOpen(true)} className="px-2.5 sm:px-4 py-2 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer">Cashier</button>}
           <button className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">☀️ <span className="hidden sm:inline">Light</span></button>
-          {account ? <span className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}</span> : <a href="https://home.deriv.com/dashboard/login" className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</a>}
+          {account ? <span className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}</span> : <button onClick={async () => { window.location.href = await derivOAuthUrl(); }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
           {!account && <a href="https://home.deriv.com/dashboard/signup?sidc=4A379AC6-1A77-4D13-8C58-C50A7A773543&lang=&utm_campaign=dynamicworks&utm_medium=affiliate&utm_source=CU254055&gad_source=1&gad_campaignid=23712486145&gbraid=0AAAABC-zKEldZ7l_rrVHwM1ZmzHzCmpiJ&gclid=EAIaIQobChMIhLK3tuW9lgMVxa-DBx1OGgyXEAAYASAAEgJ4K_D_BwE&residence=ke" target="_blank" rel="noreferrer" className="rounded-xl bg-teal-400 px-2.5 py-2 text-[10px] font-extrabold text-[#071217] transition hover:bg-teal-300 sm:px-4 sm:text-xs">Sign up</a>}
         </div>
       </header>
@@ -634,7 +695,7 @@ export default function App() {
 
       {currentTab === 'positions' && (
         <main className="flex flex-1 overflow-hidden bg-[#16161c] text-white">
-          <div className="hidden md:block"><PositionsDrawer /></div>
+          <div className="hidden md:block"><PositionsDrawer positions={positions} /></div>
           <section className="flex-1 overflow-y-auto p-4 sm:p-8">
           <div className="mx-auto max-w-4xl space-y-4">
             <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-400">Trading account</p><h1 className="mt-1 text-2xl font-extrabold">Positions</h1></div>
@@ -1202,7 +1263,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setIsCashierOpen(false)}>
           <section className="w-full max-w-md rounded-2xl border border-[#30303d] bg-[#17171f] p-6 text-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cashier-title" onClick={(event) => event.stopPropagation()}>
             <div className="mb-5 flex items-start justify-between"><div><p className="text-[10px] font-bold tracking-[0.18em] text-emerald-400">CONNECTED ACCOUNT</p><h2 id="cashier-title" className="mt-2 text-2xl font-extrabold">Cashier</h2></div><button onClick={() => setIsCashierOpen(false)} className="text-2xl text-gray-400 hover:text-white" aria-label="Close cashier">&times;</button></div>
-            <div className="rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-xs text-gray-400">{account.loginid}</p><p className="mt-2 text-2xl font-extrabold text-emerald-400">{account.balance === null ? 'Loading...' : `${account.balance.toFixed(2)} ${account.currency}`}</p><p className="mt-1 text-[11px] text-gray-500">Live Deriv balance</p></div>
+            <div className="rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-xs text-gray-400">{account.loginid}</p><div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-lg bg-emerald-500/10 p-3"><p className="text-[10px] uppercase text-gray-400">Real</p><p className="mt-1 text-lg font-extrabold text-emerald-400">{accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</p></div><div className="rounded-lg bg-sky-500/10 p-3"><p className="text-[10px] uppercase text-gray-400">Demo</p><p className="mt-1 text-lg font-extrabold text-sky-300">{accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</p></div></div><p className="mt-2 text-[11px] text-gray-500">Live Deriv balances</p></div>
           </section>
         </div>
       )}

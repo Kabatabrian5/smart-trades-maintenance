@@ -1,5 +1,5 @@
 // Deriv WebSocket Service supporting both 'tick' and 'history' message types
-const DERIV_APP_ID = import.meta.env.VITE_DERIV_WS_APP_ID || import.meta.env.VITE_DERIV_APP_ID || '3476';
+const DERIV_APP_ID = import.meta.env.VITE_DERIV_WS_APP_ID || '1089';
 const WS_URL = `wss://ws.derivws.com/websockets/v3?app_id=${encodeURIComponent(DERIV_APP_ID)}`;
 const API_TOKEN = import.meta.env.VITE_DERIV_API_TOKEN as string | undefined;
 
@@ -9,8 +9,6 @@ class DerivSocketService {
   private pendingRequests: Map<string, { resolve: Function; reject: Function }> = new Map();
   private requestQueue: any[] = [];
   public onConnectionChange?: (status: string) => void;
-  private mockInterval: any = null;
-  private currentActiveSymbol: string = 'R_100';
   private apiToken: string | undefined = API_TOKEN;
 
   constructor() {
@@ -29,7 +27,6 @@ class DerivSocketService {
 
       this.ws.onopen = () => {
         if (this.onConnectionChange) this.onConnectionChange('Live');
-        this.stopMockStream();
         this.authorize();
 
         while (this.requestQueue.length > 0) {
@@ -58,43 +55,14 @@ class DerivSocketService {
       };
 
       this.ws.onerror = () => {
-        this.startMockStream();
+        if (this.onConnectionChange) this.onConnectionChange('Connection error');
       };
 
       this.ws.onclose = () => {
-        this.startMockStream();
+        if (this.onConnectionChange) this.onConnectionChange('Disconnected');
       };
     } catch (e) {
-      this.startMockStream();
-    }
-  }
-
-  private startMockStream() {
-    if (this.onConnectionChange) this.onConnectionChange('Live (Simulated)');
-    if (this.mockInterval) return;
-
-    let basePrice = 1220.20;
-    this.mockInterval = setInterval(() => {
-      const randomDigit = Math.floor(Math.random() * 10);
-      basePrice = Number((1220.2 + (Math.random() * 0.7) + (randomDigit * 0.01)).toFixed(2));
-
-      const mockData = {
-        msg_type: 'tick',
-        tick: {
-          symbol: this.currentActiveSymbol,
-          quote: basePrice,
-        },
-      };
-      if (this.subscribers.has('tick')) {
-        this.subscribers.get('tick')?.forEach((cb) => cb(mockData));
-      }
-    }, 1000);
-  }
-
-  private stopMockStream() {
-    if (this.mockInterval) {
-      clearInterval(this.mockInterval);
-      this.mockInterval = null;
+      if (this.onConnectionChange) this.onConnectionChange('Connection error');
     }
   }
 
@@ -111,21 +79,8 @@ class DerivSocketService {
   }
 
   public send(data: object): Promise<any> {
-    if (data && (data as any).ticks) {
-      this.currentActiveSymbol = (data as any).ticks;
-    }
-
     return new Promise((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        if (data && (data as any).proposal) {
-          setTimeout(() => resolve({ proposal: { id: 'mock-prop', ask_price: 10 } }), 200);
-          return;
-        }
-        if (data && (data as any).buy) {
-          setTimeout(() => resolve({ buy: { contract_id: 123456 } }), 200);
-          return;
-        }
-
         this.requestQueue.push({ data, resolve, reject });
         this.connect();
         return;

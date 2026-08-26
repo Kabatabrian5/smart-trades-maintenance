@@ -37,7 +37,7 @@ export function useDerivSocket(symbol: string) {
         setDigitHistory(historicalDigits);
       }
     }).catch((err) => {
-      if (isMounted) setMarketStatus('Live (Simulated)');
+      if (isMounted) setMarketStatus('Market unavailable');
       console.error("Failed to fetch tick history:", err);
     });
 
@@ -74,7 +74,7 @@ export function useDerivSocket(symbol: string) {
         subscriptionId = res.subscription.id;
       }
     }).catch((e) => {
-      if (isMounted) setMarketStatus('Live (Simulated)');
+      if (isMounted) setMarketStatus('Market unavailable');
       console.error('Failed to request live ticks:', e);
     });
 

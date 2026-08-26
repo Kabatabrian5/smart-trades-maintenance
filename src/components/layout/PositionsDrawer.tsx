@@ -1,6 +1,14 @@
 import { useState } from 'react';
 
-export default function PositionsDrawer() {
+interface Position {
+  id: string;
+  symbol: string;
+  contract: string;
+  stake: number;
+  status: 'Pending' | 'Open' | 'Settled';
+}
+
+export default function PositionsDrawer({ positions }: { positions: Position[] }) {
   const [activeSubTab, setActiveSubTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
 
   return (
@@ -47,11 +55,8 @@ export default function PositionsDrawer() {
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-gray-500">
-        <div className="w-12 h-12 rounded-xl bg-[#1a1a22] border border-[#262633] flex items-center justify-center mb-3 text-gray-400 shadow-inner">
-          📊
-        </div>
-        <p className="text-xs font-medium text-gray-400">No positions yet</p>
+      <div className="flex-1 overflow-y-auto p-3 text-gray-500">
+        {positions.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-[#262633] bg-[#1a1a22] text-gray-400 shadow-inner">📊</div><p className="text-xs font-medium text-gray-400">No positions yet</p><p className="mt-1 text-[10px] text-gray-600">Completed or open trades will appear here.</p></div> : <div className="space-y-2">{positions.map((position) => <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1a1a22] p-3 text-xs"><div className="flex justify-between gap-2"><span className="font-bold text-white">{position.symbol}</span><span className="text-emerald-400">{position.status}</span></div><div className="mt-1 text-gray-500">{position.contract} · #{position.id}</div><div className="mt-2 text-gray-300">Stake {position.stake.toFixed(2)} USD</div></div>)}</div>}
       </div>
 
       {/* Footer Run Statistics */}
