@@ -10,7 +10,14 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (!code || !code_verifier || !redirect_uri) return response.status(400).json({ error: 'Missing OAuth callback fields' });
 
   try {
-    // Step 1: exchange the authorization code for an OIDC access token.
+    // Exchange the authorization code for an OIDC access token.
+    //
+    // NOTE: Deriv's OAuth flow now stops here. The legacy `/oauth2/legacy/tokens` bridge that
+    // used to convert this into acct1/token1/cur1-style legacy WebSocket tokens has been
+    // retired — that host now serves Deriv's marketing site instead of an API. The frontend
+    // is responsible for using this access_token against the current REST API (list accounts,
+    // then mint a per-account OTP WebSocket URL) instead of the old legacy `authorize` call.
+    // See src/services/derivAccounts.ts.
     const tokenResponse = await fetch('https://auth.deriv.com/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -30,50 +37,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
       });
     }
 
-    const accessToken = tokenData.access_token as string;
-
-    // Step 2: exchange the OIDC access token for legacy account session tokens.
-    // The legacy WebSocket `authorize` call does not accept an OIDC bearer token directly;
-    // it needs the acct1/token1/cur1-style tokens returned by this endpoint.
-    // This mirrors requestLegacyToken() in @deriv-com/auth-client.
-    const legacyResponse = await fetch('https://oauth.deriv.com/oauth2/legacy/tokens', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
+    return response.status(200).json({
+      access_token: tokenData.access_token,
+      token_type: tokenData.token_type,
+      expires_in: tokenData.expires_in,
     });
-
-    const legacyText = await legacyResponse.text();
-    const legacyContentType = legacyResponse.headers.get('content-type') || '';
-    let legacyData: Record<string, unknown> = {};
-    try {
-      legacyData = legacyText ? JSON.parse(legacyText) : {};
-    } catch {
-      // Non-JSON body from Deriv; fall through and report diagnostics below.
-    }
-
-    const legacyKeys = Object.keys(legacyData);
-    const hasAccountTokens = legacyKeys.some((key) => /^token\d+$/.test(key))
-      && legacyKeys.some((key) => /^acct\d+$/.test(key));
-
-    if (!legacyResponse.ok || !hasAccountTokens) {
-      // Surface field names and a safe body preview (never real token values) so we can
-      // align the parser with whatever shape Deriv is actually returning.
-      // IMPORTANT: always respond with a non-200 status here, even if Deriv itself
-      // returned 200, otherwise the frontend treats this diagnostic body as success.
-      const status = legacyResponse.ok ? 502 : (legacyResponse.status || 502);
-      return response.status(status).json({
-        error: 'Deriv did not return usable legacy account tokens',
-        deriv_error: (legacyData as { error?: string; error_description?: string }).error_description
-          || (legacyData as { error?: string }).error
-          || undefined,
-        response_keys: legacyKeys,
-        legacy_status: legacyResponse.status,
-        legacy_content_type: legacyContentType,
-        // Safe because this only runs when no account tokens were found in the body.
-        legacy_body_preview: legacyText.slice(0, 500),
-      });
-    }
-
-    return response.status(200).json(legacyData);
   } catch (error) {
     console.error('Deriv token exchange request failed:', error);
     return response.status(502).json({ error: 'Unable to reach Deriv token service' });
