@@ -2,6 +2,30 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const DERIV_CLIENT_ID = process.env.DERIV_CLIENT_ID || process.env.VITE_DERIV_CLIENT_ID || process.env.VITE_DERIV_APP_ID || '34bIcDF1RsEKSAbKFKimH';
 
+type TokenRecord = Record<string, unknown>;
+
+function findLegacyAccounts(value: unknown, accounts: Record<string, string> = {}, index = { value: 0 }) {
+  if (!value || typeof value !== 'object') return accounts;
+  if (Array.isArray(value)) {
+    value.forEach((item) => findLegacyAccounts(item, accounts, index));
+    return accounts;
+  }
+
+  const record = value as TokenRecord;
+  const loginid = record.loginid || record.acct || record.account || record.account_id;
+  const token = record.token || record.oauth_token || record.session_token || record.access_token;
+  if (typeof loginid === 'string' && typeof token === 'string') {
+    index.value += 1;
+    accounts[`acct${index.value}`] = loginid;
+    accounts[`token${index.value}`] = token;
+    accounts[`cur${index.value}`] = typeof record.cur === 'string' ? record.cur : typeof record.currency === 'string' ? record.currency : 'USD';
+    return accounts;
+  }
+
+  Object.values(record).forEach((item) => findLegacyAccounts(item, accounts, index));
+  return accounts;
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed' });
   if (!DERIV_CLIENT_ID) return response.status(500).json({ error: 'Deriv OAuth client ID is not configured' });
@@ -31,7 +55,16 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
     if (!tokenData.access_token) return response.status(502).json({ error: 'Deriv did not return an access token' });
 
-    return response.status(200).json({ access_token: tokenData.access_token });
+    const legacyResponse = await fetch('https://oauth.deriv.com/oauth2/legacy/tokens', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const legacyData = await legacyResponse.json().catch(() => ({}));
+    if (!legacyResponse.ok) return response.status(legacyResponse.status).json({ error: legacyData.error_description || legacyData.error || 'Deriv legacy token request failed' });
+
+    const accounts = findLegacyAccounts(legacyData);
+    if (!accounts.token1 || !accounts.acct1) return response.status(502).json({ error: 'Deriv returned no usable account session token', response_keys: Object.keys(legacyData) });
+    return response.status(200).json(accounts);
   } catch (error) {
     console.error('Deriv token exchange request failed:', error);
     return response.status(502).json({ error: 'Unable to reach Deriv token service' });

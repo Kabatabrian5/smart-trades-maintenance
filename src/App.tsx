@@ -185,9 +185,9 @@ export default function App() {
         const details = errorResponse.deriv_error || (errorResponse.response_keys?.length ? `response fields: ${errorResponse.response_keys.join(', ')}` : '');
         throw new Error([errorResponse.error || `Token exchange failed (${response.status})`, details].filter(Boolean).join(' - '));
       }
-      const tokenResponse = await response.json() as { access_token?: string; loginid?: string; currency?: string };
-      if (!tokenResponse.access_token) throw new Error('No Deriv access token returned');
-      await authorizeAccount(tokenResponse.access_token, tokenResponse.loginid || 'Deriv account', tokenResponse.currency || 'USD');
+      const tokenResponse = await response.json() as { token1?: string; acct1?: string; cur1?: string };
+      if (!tokenResponse.token1 || !tokenResponse.acct1) throw new Error('Deriv returned no usable account session token');
+      await authorizeAccount(tokenResponse.token1, tokenResponse.acct1, tokenResponse.cur1 || 'USD');
       sessionStorage.removeItem('deriv_pkce_verifier');
       sessionStorage.removeItem('deriv_oauth_state');
       window.history.replaceState({}, document.title, window.location.pathname);
