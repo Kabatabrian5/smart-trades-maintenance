@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import PositionsDrawer from './components/layout/PositionsDrawer';
 import { useDerivSocket } from './hooks/useDerivSocket';
 import { derivService } from './services/derivSocket';
-import { fetchOptionsAccounts, requestAccountWebSocketUrl, pickPrimaryAccount } from './services/derivAccounts';
+import { fetchOptionsAccounts, requestAccountWebSocketUrl, pickPrimaryAccount, type DerivOptionsAccount } from './services/derivAccounts';
 
 const VOLATILITY_MARKETS = [
   { id: '1HZ10V', name: 'Volatility 10 (1s) Index' },
@@ -56,6 +56,7 @@ interface DerivAccount {
   token: string;
   currency: string;
   balance: number | null;
+  accountType?: 'real' | 'demo';
 }
 
 interface AccountBalances {
@@ -142,6 +143,9 @@ function playSignalBeep() {
 export default function App() {
   const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots'>('manual-trading');
   const [isCashierOpen, setIsCashierOpen] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [cashierTab, setCashierTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
+  const [availableAccounts, setAvailableAccounts] = useState<DerivOptionsAccount[]>([]);
   const [account, setAccount] = useState<DerivAccount | null>(() => {
     const savedAccount = sessionStorage.getItem('smart-trades-account');
     return savedAccount ? JSON.parse(savedAccount) as DerivAccount : null;
@@ -199,6 +203,7 @@ export default function App() {
     const accounts = await fetchOptionsAccounts(accessToken, DERIV_CLIENT_ID);
     const primary = pickPrimaryAccount(accounts);
     if (!primary) throw new Error('Deriv account list was empty');
+    setAvailableAccounts(accounts);
 
     const wsUrl = await requestAccountWebSocketUrl(accessToken, DERIV_CLIENT_ID, primary.account_id);
     derivService.connectToUrl(wsUrl);
@@ -208,10 +213,36 @@ export default function App() {
       token: accessToken,
       currency: primary.currency,
       balance: normalizeBalance(primary.balance),
+      accountType: primary.account_type === 'real' ? 'real' : 'demo',
     };
     sessionStorage.setItem('smart-trades-account', JSON.stringify(nextAccount));
     setAccount(nextAccount);
     setAuthStatus('idle');
+  }
+
+  async function switchAccount(nextAccount: DerivOptionsAccount) {
+    if (!account || nextAccount.account_id === account.loginid || nextAccount.status !== 'active') return;
+    setAuthStatus('authorizing');
+    setIsAccountMenuOpen(false);
+    try {
+      const wsUrl = await requestAccountWebSocketUrl(account.token, DERIV_CLIENT_ID, nextAccount.account_id);
+      derivService.connectToUrl(wsUrl);
+      const accountType = nextAccount.account_type === 'real' ? 'real' : 'demo';
+      const updatedAccount: DerivAccount = {
+        loginid: nextAccount.account_id,
+        token: account.token,
+        currency: nextAccount.currency,
+        balance: normalizeBalance(nextAccount.balance),
+        accountType,
+      };
+      sessionStorage.setItem('smart-trades-account', JSON.stringify(updatedAccount));
+      setAccount(updatedAccount);
+      setAccountBalances((previous) => ({ ...previous, [accountType]: normalizeBalance(nextAccount.balance), currency: nextAccount.currency }));
+      setAuthStatus('idle');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Deriv account switch failed');
+      setAuthStatus('failed');
+    }
   }
 
   useEffect(() => {
@@ -220,7 +251,7 @@ export default function App() {
     const unsubscribeBalance = derivService.subscribe('balance', (data: { balance?: { balance?: number; loginid?: string; currency?: string } }) => {
       const balance = normalizeBalance(data.balance?.balance);
       if (balance === null) return;
-      const isDemo = data.balance?.loginid?.startsWith('VR') || account.loginid.startsWith('VR');
+      const isDemo = account.accountType === 'demo' || data.balance?.loginid?.startsWith('VR') || account.loginid.startsWith('VR');
       setAccountBalances((previous) => ({ ...previous, [isDemo ? 'demo' : 'real']: balance, currency: data.balance?.currency || previous.currency }));
       setAccount((previous) => {
         if (!previous) return previous;
@@ -598,7 +629,7 @@ export default function App() {
           {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
           {account && <button onClick={() => setIsCashierOpen(true)} className="px-2.5 sm:px-4 py-2 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer">Cashier</button>}
           <button className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">☀️ <span className="hidden sm:inline">Light</span></button>
-          {account ? <span className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}</span> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
+          {account ? <div className="relative"><button onClick={() => setIsAccountMenuOpen((open) => !open)} className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}⌄</button>{isAccountMenuOpen && <div className="absolute right-0 top-12 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; return <button key={option.account_id} disabled={isActive || option.status !== 'active'} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}</div>}</div> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
           {!account && <a href="https://home.deriv.com/dashboard/signup?_gl=1*4zo6tf*_gcl_au*MTM1MjEzODExOS4xNzg3NzcxMjUx&residence=ke" target="_blank" rel="noreferrer" className="rounded-xl bg-teal-400 px-2.5 py-2 text-[10px] font-extrabold text-[#071217] transition hover:bg-teal-300 sm:px-4 sm:text-xs">Sign up</a>}
         </div>
       </header>
@@ -1292,8 +1323,11 @@ export default function App() {
       {isCashierOpen && account && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setIsCashierOpen(false)}>
           <section className="w-full max-w-md rounded-2xl border border-[#30303d] bg-[#17171f] p-6 text-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cashier-title" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-5 flex items-start justify-between"><div><p className="text-[10px] font-bold tracking-[0.18em] text-emerald-400">CONNECTED ACCOUNT</p><h2 id="cashier-title" className="mt-2 text-2xl font-extrabold">Cashier</h2></div><button onClick={() => setIsCashierOpen(false)} className="text-2xl text-gray-400 hover:text-white" aria-label="Close cashier">&times;</button></div>
-            <div className="rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-xs text-gray-400">{account.loginid}</p><div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-lg bg-emerald-500/10 p-3"><p className="text-[10px] uppercase text-gray-400">Real</p><p className="mt-1 text-lg font-extrabold text-emerald-400">{accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</p></div><div className="rounded-lg bg-sky-500/10 p-3"><p className="text-[10px] uppercase text-gray-400">Demo</p><p className="mt-1 text-lg font-extrabold text-sky-300">{accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</p></div></div><p className="mt-2 text-[11px] text-gray-500">Live Deriv balances</p></div>
+            <div className="mb-5 flex items-start justify-between"><div><p className="text-[10px] font-bold tracking-[0.18em] text-emerald-400">{account.loginid}</p><h2 id="cashier-title" className="mt-2 text-2xl font-extrabold">Cashier</h2></div><button onClick={() => setIsCashierOpen(false)} className="text-2xl text-gray-400 hover:text-white" aria-label="Close cashier">&times;</button></div>
+            <div className="rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-xs text-gray-400">Available balance</p><p className="mt-1 text-2xl font-extrabold text-emerald-400">{account.balance === null ? '--' : account.balance.toFixed(2)} {account.currency}</p></div>
+            <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-[#121217] p-1">{(['deposit', 'withdraw', 'history'] as const).map((tab) => <button key={tab} onClick={() => setCashierTab(tab)} className={`rounded-lg px-2 py-2 text-xs font-bold capitalize ${cashierTab === tab ? 'bg-emerald-500/20 text-emerald-300' : 'text-gray-500 hover:text-gray-200'}`}>{tab}</button>)}</div>
+            {cashierTab === 'history' ? <div className="mt-4 rounded-xl border border-dashed border-[#30303d] p-8 text-center text-xs text-gray-500">No transactions</div> : <div className="mt-4 rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-sm font-bold text-gray-200">{cashierTab === 'deposit' ? 'Pay with M-Pesa' : 'Withdraw to M-Pesa'}</p><label className="mt-4 block text-[10px] font-bold uppercase tracking-wider text-gray-500">Phone</label><input className="mt-1 w-full rounded-lg border border-[#30303d] bg-[#17171f] px-3 py-2 text-sm text-white outline-none" inputMode="tel" placeholder="07XX XXX XXX" /><label className="mt-3 block text-[10px] font-bold uppercase tracking-wider text-gray-500">Amount {account.currency} · min 5</label><input className="mt-1 w-full rounded-lg border border-[#30303d] bg-[#17171f] px-3 py-2 text-sm text-white outline-none" type="number" min="5" placeholder="0.00" /><div className="mt-3 flex gap-1.5">{[5, 10, 20, 50, 100].map((amount) => <button key={amount} className="rounded-md border border-[#30303d] px-2 py-1 text-[10px] text-gray-400 hover:border-emerald-400 hover:text-emerald-300">${amount}</button>)}</div><button disabled className="mt-4 w-full cursor-not-allowed rounded-lg bg-emerald-500/20 px-3 py-2 text-xs font-bold text-emerald-300">{cashierTab === 'deposit' ? 'Pay with M-Pesa' : 'Request withdrawal'} (coming soon)</button></div>}
+            <p className="mt-4 text-center text-[10px] text-gray-600">DeriPay integration pending merchant configuration</p>
           </section>
         </div>
       )}
