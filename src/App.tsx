@@ -88,6 +88,15 @@ const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined
 
 const DERIV_CLIENT_ID = import.meta.env.VITE_DERIV_CLIENT_ID || '34bIcDF1RsEKSAbKFKimH';
 
+function normalizeBalance(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function toBase64Url(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -198,7 +207,7 @@ export default function App() {
       loginid: primary.account_id,
       token: accessToken,
       currency: primary.currency,
-      balance: primary.balance,
+      balance: normalizeBalance(primary.balance),
     };
     sessionStorage.setItem('smart-trades-account', JSON.stringify(nextAccount));
     setAccount(nextAccount);
@@ -209,12 +218,13 @@ export default function App() {
     if (!account) return;
 
     const unsubscribeBalance = derivService.subscribe('balance', (data: { balance?: { balance?: number; loginid?: string; currency?: string } }) => {
-      if (typeof data.balance?.balance !== 'number') return;
-      const isDemo = data.balance.loginid?.startsWith('VR') || account.loginid.startsWith('VR');
-      setAccountBalances((previous) => ({ ...previous, [isDemo ? 'demo' : 'real']: data.balance?.balance ?? null, currency: data.balance?.currency || previous.currency }));
+      const balance = normalizeBalance(data.balance?.balance);
+      if (balance === null) return;
+      const isDemo = data.balance?.loginid?.startsWith('VR') || account.loginid.startsWith('VR');
+      setAccountBalances((previous) => ({ ...previous, [isDemo ? 'demo' : 'real']: balance, currency: data.balance?.currency || previous.currency }));
       setAccount((previous) => {
         if (!previous) return previous;
-        const updated = { ...previous, balance: data.balance?.balance ?? null };
+        const updated = { ...previous, balance };
         sessionStorage.setItem('smart-trades-account', JSON.stringify(updated));
         return updated;
       });

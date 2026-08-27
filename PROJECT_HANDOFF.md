@@ -373,8 +373,11 @@ Configured OAuth PKCE flow and server-side token exchange handler.
 
 Identified and documented the deprecation of the legacy token endpoint and the requirement for server-side REST/OTP proxies.
 
+During a production login test on 27 August 2026, OAuth returned to Smart Trades and account loading reached the UI, but rendering failed because Deriv supplied `balance` as a string while the UI called `.toFixed()` directly. `src/App.tsx` now normalizes numeric balance values from account discovery and live balance messages before storage and rendering. `npm run build` passes with this fix.
+
 Still Needs Work:
-Finalize server-side Vercel proxy handlers for modern account listing and OTP generation to prevent browser CORS crashes.
+Deploy and repeat the production login test after the balance normalization fix.
+Finalize server-side routing for modern account listing and OTP generation to prevent browser CORS crashes.
 
 Complete independent real/demo account discovery and balance subscriptions.
 
