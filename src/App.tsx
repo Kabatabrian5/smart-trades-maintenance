@@ -180,9 +180,22 @@ export default function App() {
     let isMounted = true;
     setAuthStatus('authorizing');
     fetch('/api/deriv-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, code_verifier: sessionStorage.getItem('deriv_pkce_verifier'), redirect_uri: window.location.origin }) }).then(async (response) => {
-      const errorResponse = await response.clone().json().catch(() => ({})) as { error?: string; response_keys?: string[]; deriv_error?: string };
+      const errorResponse = await response.clone().json().catch(() => ({})) as {
+        error?: string;
+        response_keys?: string[];
+        deriv_error?: string;
+        legacy_status?: number;
+        legacy_content_type?: string;
+        legacy_body_preview?: string;
+      };
       if (!response.ok) {
-        const details = errorResponse.deriv_error || (errorResponse.response_keys?.length ? `response fields: ${errorResponse.response_keys.join(', ')}` : '');
+        const details = [
+          errorResponse.deriv_error,
+          errorResponse.response_keys?.length ? `fields: ${errorResponse.response_keys.join(', ')}` : '',
+          errorResponse.legacy_status !== undefined ? `legacy status: ${errorResponse.legacy_status}` : '',
+          errorResponse.legacy_content_type ? `content-type: ${errorResponse.legacy_content_type}` : '',
+          errorResponse.legacy_body_preview ? `body: ${errorResponse.legacy_body_preview.slice(0, 200)}` : '',
+        ].filter(Boolean).join(' | ');
         throw new Error([errorResponse.error || `Token exchange failed (${response.status})`, details].filter(Boolean).join(' - '));
       }
       const tokenResponse = await response.json() as { token1?: string; acct1?: string; cur1?: string };
