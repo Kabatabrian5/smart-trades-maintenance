@@ -332,7 +332,7 @@ export default function App() {
     }).catch(() => {
       if (isMounted) setSignalDigitStats(digitStatsPlaceholder());
     }).finally(() => {
-      if (isMounted) setTimeout(() => setIsSearchingSignals(false), 500);
+      if (isMounted) setTimeout(() => setIsSearchingSignals(false), 1400);
     });
     return () => { isMounted = false; };
   }, [signalMarket]);
@@ -388,6 +388,7 @@ export default function App() {
   // Bot Builder internal state & Blocks Modal
   const [builderCategory, setBuilderCategory] = useState<string>('Trade parameters');
   const [rightPanelTab, setRightPanelTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
+  const [positionsPanelTab, setPositionsPanelTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
   const [isBotRunning, setIsBotRunning] = useState(false);
   const [botRuns, setBotRuns] = useState(0);
   const [botProfit, setBotProfit] = useState(0);
@@ -577,14 +578,18 @@ export default function App() {
 
       if (proposalRes.proposal) {
         const buyRes = await derivService.buyContract(proposalRes.proposal.id, proposalRes.proposal.ask_price);
-        setPositions((current) => [{
+        const recordedPosition: Position = {
           id: String(buyRes.buy.contract_id),
           symbol: selectedSymbol,
           contract: contractType,
           stake,
           status: 'Open',
-        }, ...current]);
-        sessionStorage.setItem('smart-trades-positions', JSON.stringify([{ id: String(buyRes.buy.contract_id), symbol: selectedSymbol, contract: contractType, stake, status: 'Open' }, ...positions]));
+        };
+        setPositions((current) => {
+          const updatedPositions = [recordedPosition, ...current];
+          sessionStorage.setItem('smart-trades-positions', JSON.stringify(updatedPositions));
+          return updatedPositions;
+        });
         alert(`Digit Trade executed! Contract ID: ${buyRes.buy.contract_id}`);
       }
     } catch (error: any) {
@@ -755,19 +760,26 @@ export default function App() {
       )}
 
       {currentTab === 'positions' && (
-        <main className="flex flex-1 overflow-hidden bg-[#16161c] text-white">
+        <main className="flex flex-1 overflow-hidden bg-[#101116] text-white">
           <div className="hidden md:block"><PositionsDrawer positions={positions} /></div>
-          <section className="flex-1 overflow-y-auto p-4 sm:p-8">
-          <div className="mx-auto max-w-4xl space-y-4">
-            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-400">Trading account</p><h1 className="mt-1 text-2xl font-extrabold">Positions</h1></div>
-            {positions.length === 0 ? <div className="rounded-2xl border border-[#262633] bg-[#1b1b24] p-10 text-center text-sm text-gray-500">No open positions yet. Place a trade from Manual trading.</div> : <div className="space-y-2">{positions.map((position) => <div key={position.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div><p className="font-bold">{position.symbol}</p><p className="text-xs text-gray-400">{position.contract} · Contract #{position.id}</p></div><div className="text-right"><p className="font-bold">{position.stake.toFixed(2)} USD</p><p className="text-xs text-emerald-400">{position.status}</p></div></div>)}</div>}
+          <section className="flex-1 overflow-y-auto p-0 sm:p-6">
+          <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col border-x border-[#242630] bg-[#111217]">
+            <div className="flex items-center justify-between border-b border-[#252630] px-4 py-4 sm:px-6"><div><p className="text-lg font-extrabold">Positions</p><p className="mt-1 text-[10px] text-gray-500">Recorded trading activity</p></div><span className="text-gray-500">×</span></div>
+            <div className="grid grid-cols-3 border-b border-[#252630]">{(['summary', 'transactions', 'journal'] as const).map((tab) => <button key={tab} onClick={() => setPositionsPanelTab(tab)} className={`border-b-2 px-2 py-3 text-xs font-semibold capitalize transition-colors ${positionsPanelTab === tab ? 'border-rose-500 text-white' : 'border-transparent text-gray-500 hover:text-gray-200'}`}>{tab}</button>)}</div>
+            {positionsPanelTab === 'summary' && <>
+              {positions.length === 0 ? <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center px-6 text-center"><div className="grid h-12 w-12 place-items-center rounded-xl border border-[#30313c] bg-[#1b1c25] text-lg">▥</div><p className="mt-4 text-sm font-bold text-gray-200">No positions yet</p><p className="mt-1 text-[10px] text-gray-500">Completed or open trades will appear here.</p></div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => <div key={position.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div><p className="font-bold">{position.symbol}</p><p className="text-xs text-gray-400">{position.contract} · Contract #{position.id}</p></div><div className="text-right"><p className="font-bold">{position.stake.toFixed(2)} USD</p><p className="text-xs text-emerald-400">{position.status}</p></div></div>)}</div>}
+              <div className="border-t border-[#252630] px-4 py-5 sm:px-6"><div className="grid grid-cols-3 gap-y-5 text-center"><div><p className="text-[9px] uppercase text-gray-500">Total stake</p><p className="text-xs font-bold">{positions.reduce((total, position) => total + position.stake, 0).toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Total payout</p><p className="text-xs font-bold">0.00 USD</p></div><div><p className="text-[9px] uppercase text-gray-500">No. of runs</p><p className="text-xs font-bold">{positions.length}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts lost</p><p className="text-xs font-bold">0</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts won</p><p className="text-xs font-bold">0</p></div><div><p className="text-[9px] uppercase text-gray-500">Total profit/loss</p><p className="text-xs font-bold text-emerald-400">0.00 USD</p></div></div><button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="mt-5 w-full rounded-xl border border-[#363744] bg-[#1d1e27] py-2.5 text-xs font-bold text-gray-200 transition hover:border-rose-400 hover:text-white">Reset</button></div>
+            </>}
+            {positionsPanelTab === 'transactions' && <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No active contract transactions yet.</div>}
+            {positionsPanelTab === 'journal' && <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">System logs and triggers will appear here.</div>}
           </div>
           </section>
         </main>
       )}
 
       {currentTab === 'signal' && (
-        <main className="flex-1 overflow-y-auto bg-[#16161c] p-4 sm:p-8 text-white">
+        <main className="relative flex-1 overflow-y-auto bg-[#16161c] p-4 text-white sm:p-8">
+          {isSearchingSignals && <div className="signal-cinema" role="status" aria-live="polite"><div className="signal-cinema__scanline" /><div className="signal-cinema__radar" aria-hidden="true"><span /><i /><b /></div><p className="signal-cinema__eyebrow">SIGNAL ENGINE // LIVE SCAN</p><h2>Reading market behavior</h2><p className="signal-cinema__message">Sampling recent ticks, digit frequency, and contract patterns for {signalMarket}.</p><div className="signal-cinema__steps"><span className="signal-cinema__step signal-cinema__step--active">01 HISTORY</span><span className="signal-cinema__step">02 FREQUENCY</span><span className="signal-cinema__step">03 CONTEXT</span></div><div className="signal-cinema__bar"><span /></div></div>}
           <div className="mx-auto max-w-4xl space-y-5">
             <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-400">Digit signal</p><h1 className="mt-1 text-2xl font-extrabold">Hourly signal</h1><p className="mt-2 text-sm text-gray-400">Choose a market to scan the next hour.</p></div><select value={signalMarket} onChange={(event) => { setSignalMarket(event.target.value); playSignalBeep(); }} className="rounded-xl border border-[#30303d] bg-[#1b1b24] px-3 py-2 text-sm font-bold text-white outline-none">{liveMarkets.map((market) => <option key={market.id} value={market.id}>{market.name}</option>)}</select></div>
             <div className="overflow-hidden rounded-2xl border border-cyan-500/30 bg-[#08131c] p-5"><div className="flex items-center gap-4"><div className="relative grid h-14 w-14 place-items-center rounded-xl border border-cyan-400/50 bg-cyan-400/10 text-2xl shadow-[0_0_25px_rgba(34,211,238,0.25)]"><span className="animate-pulse">◉</span><span className="absolute inset-0 animate-ping rounded-xl border border-cyan-400/40" /></div><div><p className="font-mono text-sm font-bold text-cyan-300">SIGNAL ENGINE // {isSearchingSignals ? 'SEARCHING...' : 'SCAN COMPLETE'}</p><p className="mt-1 text-xs text-slate-400">{isSearchingSignals ? `Scanning ${signalMarket} patterns and digit frequencies` : `Hourly scan ready for ${signalMarket}`}</p></div></div><div className="mt-4 h-1 overflow-hidden rounded-full bg-slate-800"><div className={`h-full bg-cyan-400 transition-all duration-700 ${isSearchingSignals ? 'w-2/3 animate-pulse' : 'w-full'}`} /></div></div>

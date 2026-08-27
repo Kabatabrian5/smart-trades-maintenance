@@ -363,3 +363,98 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-cinema *, .auth-cinema::before { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+.signal-cinema {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(circle at center, rgba(8, 38, 48, 0.98), rgba(8, 12, 18, 0.99) 62%);
+  padding: 24px;
+  text-align: center;
+  animation: signal-cinema-in 240ms ease-out both;
+}
+
+.signal-cinema::before,
+.signal-cinema::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+}
+
+.signal-cinema::before {
+  opacity: 0.25;
+  background-image: linear-gradient(rgba(44, 221, 198, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(44, 221, 198, 0.15) 1px, transparent 1px);
+  background-size: 36px 36px;
+  animation: signal-grid-drift 2.4s linear infinite;
+}
+
+.signal-cinema::after {
+  background: repeating-linear-gradient(0deg, transparent 0 4px, rgba(108, 240, 218, 0.08) 5px, transparent 6px);
+}
+
+.signal-cinema__scanline {
+  position: absolute;
+  inset: -10% 0 auto;
+  height: 2px;
+  background: #42e3c9;
+  box-shadow: 0 0 18px 4px rgba(66, 227, 201, 0.5);
+  animation: signal-scanline 1.4s ease-in-out infinite;
+}
+
+.signal-cinema__radar {
+  position: relative;
+  z-index: 1;
+  width: min(38vw, 140px);
+  aspect-ratio: 1;
+  margin-bottom: 24px;
+  border: 1px solid rgba(66, 227, 201, 0.55);
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, transparent 0 24%, rgba(66, 227, 201, 0.16) 25% 25.8%, transparent 26.8% 49%);
+  box-shadow: 0 0 35px rgba(24, 190, 171, 0.2);
+}
+
+.signal-cinema__radar::before,
+.signal-cinema__radar::after {
+  position: absolute;
+  background: rgba(66, 227, 201, 0.32);
+  content: '';
+}
+
+.signal-cinema__radar::before { top: 0; bottom: 0; left: 50%; width: 1px; }
+.signal-cinema__radar::after { top: 50%; right: 0; left: 0; height: 1px; }
+.signal-cinema__radar span,
+.signal-cinema__radar i,
+.signal-cinema__radar b { position: absolute; z-index: 2; width: 6px; height: 6px; border-radius: 50%; background: #ffb347; box-shadow: 0 0 12px #ffb347; }
+.signal-cinema__radar span { top: 22%; left: 65%; animation: signal-blip 1.2s infinite; }
+.signal-cinema__radar i { top: 63%; left: 28%; animation: signal-blip 1.2s 350ms infinite; }
+.signal-cinema__radar b { top: 38%; left: 32%; animation: signal-blip 1.2s 700ms infinite; }
+
+.signal-cinema__eyebrow,
+.signal-cinema h2,
+.signal-cinema__message,
+.signal-cinema__steps,
+.signal-cinema__bar { position: relative; z-index: 1; }
+.signal-cinema__eyebrow { margin: 0 0 9px; color: #4fe1ca; font: 800 10px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: 0.2em; }
+.signal-cinema h2 { margin: 0; color: #f5fffd; font-size: clamp(24px, 7vw, 42px); font-weight: 900; }
+.signal-cinema__message { max-width: 400px; margin: 13px 0 20px; color: #8fa7af; font-size: 12px; line-height: 1.6; }
+.signal-cinema__steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; color: #54727a; font: 700 9px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: 0.08em; }
+.signal-cinema__step--active { color: #ffb347; }
+.signal-cinema__bar { width: min(80vw, 320px); height: 3px; margin-top: 18px; overflow: hidden; background: rgba(143, 167, 175, 0.18); }
+.signal-cinema__bar span { display: block; width: 38%; height: 100%; background: linear-gradient(90deg, #1acbb5, #ffb347); box-shadow: 0 0 12px #1acbb5; animation: signal-bar 1.3s ease-in-out infinite; }
+
+@keyframes signal-cinema-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes signal-grid-drift { to { background-position: 0 36px; } }
+@keyframes signal-scanline { 0%, 100% { transform: translateY(0); opacity: 0.15; } 50% { transform: translateY(108vh); opacity: 1; } }
+@keyframes signal-blip { 0%, 100% { opacity: 0.25; transform: scale(0.7); } 45% { opacity: 1; transform: scale(1.5); } }
+@keyframes signal-bar { 0% { transform: translateX(-120%); } 60%, 100% { transform: translateX(300%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-cinema *, .signal-cinema::before { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
