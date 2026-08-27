@@ -1320,6 +1320,27 @@ export default function App() {
         </div>
       )}
       {authStatus === 'failed' && <div className="fixed bottom-16 left-1/2 z-40 max-w-[min(90vw,32rem)] -translate-x-1/2 rounded-xl border border-rose-500/40 bg-[#29151b] px-4 py-3 text-xs text-rose-200 shadow-xl">Deriv login could not be completed: {authError || 'Please try again.'}</div>}
+      {authStatus === 'authorizing' && (
+        <div className="auth-cinema fixed inset-0 z-[70] overflow-hidden bg-[#05080d]" role="status" aria-live="polite">
+          <div className="auth-cinema__grid" />
+          <div className="auth-cinema__noise" />
+          <div className="auth-cinema__content">
+            <div className="auth-cinema__scene" aria-hidden="true">
+              <div className="auth-cinema__ring auth-cinema__ring--outer" />
+              <div className="auth-cinema__ring auth-cinema__ring--inner" />
+              <div className="auth-cinema__core"><span>ST</span></div>
+              <i className="auth-cinema__spark auth-cinema__spark--one" />
+              <i className="auth-cinema__spark auth-cinema__spark--two" />
+              <i className="auth-cinema__spark auth-cinema__spark--three" />
+            </div>
+            <p className="auth-cinema__eyebrow">SECURE DERIV LINK</p>
+            <h1>Entering the market</h1>
+            <p className="auth-cinema__message">Authenticating your account and preparing the live trading connection.</p>
+            <div className="auth-cinema__progress" aria-hidden="true"><span /></div>
+            <p className="auth-cinema__status"><span /> Establishing encrypted session</p>
+          </div>
+        </div>
+      )}
       {isCashierOpen && account && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setIsCashierOpen(false)}>
           <section className="w-full max-w-md rounded-2xl border border-[#30303d] bg-[#17171f] p-6 text-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cashier-title" onClick={(event) => event.stopPropagation()}>
