@@ -12,8 +12,6 @@ function findLegacyAccounts(value: unknown, accounts: Record<string, string> = {
   }
 
   const record = value as TokenRecord;
-  
-  // Check if object has direct acct1/token1
   if (typeof record.acct1 === 'string' && typeof record.token1 === 'string') {
     return Object.keys(record).reduce((tokens: Record<string, string>, key) => {
       const item = record[key];
@@ -59,7 +57,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: DERIV_CLIENT_ID,
-      code,
+        code,
         code_verifier,
         redirect_uri,
       }),
@@ -74,31 +72,51 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
     if (!tokenData.access_token) return response.status(502).json({ error: 'Deriv did not return an access token' });
 
+    // Request legacy tokens using POST with correct headers & body if required by Deriv OIDC spec
     const legacyResponse = await fetch('https://oauth.deriv.com/oauth2/legacy/tokens', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      headers: { 
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ target_client_id: DERIV_CLIENT_ID })
     });
-    
-    const legacyData = await legacyResponse.json().catch(() => ({}));
-    
-    // Safely log structure overview on server console without exposing sensitive values
-    console.log('Legacy Token Response Status:', legacyResponse.status);
-    console.log('Legacy Token Response Keys:', Object.keys(legacyData));
+
+    const rawText = await legacyResponse.text();
+    console.log('Legacy Token Raw Response Text:', rawText);
+
+    let legacyData: any = {};
+    try {
+      legacyData = JSON.parse(rawText);
+    } catch (e) {
+      legacyData = { raw: rawText };
+    }
 
     if (!legacyResponse.ok) {
       return response.status(legacyResponse.status).json({ 
-        error: legacyData.error_description || legacyData.error || 'Deriv legacy token request failed',
+        error: 'Deriv legacy token request failed',
         details: legacyData 
       });
     }
 
     const accounts = findLegacyAccounts(legacyData);
     
+    // Fallback: If legacy endpoint returns token directly inside tokenData or array items
+    if (!accounts.token1 || !accounts.acct1) {
+      if (tokenData.token && tokenData.account_list) {
+        // Map tokenData accounts directly if available
+        tokenData.account_list.forEach((acc: any, idx: number) => {
+          accounts[`acct${idx + 1}`] = acc.loginid;
+          accounts[`token${idx + 1}`] = acc.token;
+          accounts[`cur${idx + 1}`] = acc.currency || 'USD';
+        });
+      }
+    }
+
     if (!accounts.token1 || !accounts.acct1) {
       return response.status(502).json({ 
         error: 'Deriv returned no usable account session token', 
-        response_keys: Object.keys(legacyData),
-        sample_structure: JSON.stringify(legacyData).slice(0, 300) // Provides a safe layout peek
+        raw_response: rawText.slice(0, 400)
       });
     }
 
