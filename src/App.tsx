@@ -691,8 +691,8 @@ export default function App() {
 
       {/* Manual Trading View */}
       {currentTab === 'manual-trading' && (
-        <div className="flex flex-1 flex-col overflow-hidden pb-16 md:flex-row md:pb-0">
-          <main className="flex-1 min-w-0 flex flex-col bg-[#16161c] overflow-y-auto p-2 pb-28 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
+        <div className="flex flex-1 flex-col pb-16 md:flex-row md:overflow-hidden md:pb-0">
+          <main className="flex-1 min-w-0 flex flex-col bg-[#16161c] md:overflow-y-auto p-2 pb-28 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
             <div className="flex items-center justify-between bg-[#1b1b24] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-[#262633] shadow-md shrink-0">
               <div className="flex items-center space-x-3">
                 <span className={`w-3 h-3 rounded-full ${marketStatus.includes('Live') ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
@@ -789,6 +789,12 @@ export default function App() {
             </div>
             <div className="grid grid-cols-2 gap-3 pt-3 sm:pt-4 border-t border-[#22222c]">
               {tradeButtons.map((button, index) => <button key={button.type} onClick={() => handlePurchase(button.type)} className={`py-3 px-2 rounded-xl text-center font-bold cursor-pointer ${index === 0 ? 'bg-teal-500 text-black' : 'bg-rose-600 text-white'}`}>{button.label}</button>)}
+            </div>
+            <div className="mt-3 space-y-1.5 rounded-xl border border-[#22222c] bg-[#181820] p-3 text-[11px] sm:hidden">
+              <div className="flex items-center justify-between"><span className="text-gray-500">Market</span><span className="font-semibold text-gray-200">{liveMarkets.find((market) => market.id === selectedSymbol)?.name ?? selectedSymbol}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-500">Contract</span><span className="font-semibold text-gray-200">{TRADE_MODES.find((mode) => mode.id === tradeMode)?.label}{isDigitMode ? ` · Digit ${selectedDigit}` : ''}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-500">Ticks</span><span className="font-semibold text-gray-200">{ticksCount}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-500">Stake at risk</span><span className="font-semibold text-white">{stake.toFixed(2)} USD</span></div>
             </div>
           </aside>
         </div>
