@@ -608,7 +608,7 @@ export default function App() {
         <div className="flex items-center space-x-6 min-w-0">
           <div className="flex items-center space-x-2">
             <span className="w-7 h-7 rounded-lg bg-gradient-to-tr from-teal-500 to-blue-600 flex items-center justify-center font-extrabold text-black text-xs">ST</span>
-            <span className="font-extrabold text-sm tracking-wide text-white whitespace-nowrap">Smartest <span className="text-teal-400">Trades</span></span>
+            <span className="hidden font-extrabold text-sm tracking-wide text-white whitespace-nowrap sm:inline">Smartest <span className="text-teal-400">Trades</span></span>
           </div>
 
           <nav className="hidden md:flex items-center space-x-1 overflow-x-auto">
@@ -629,12 +629,12 @@ export default function App() {
           {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
           {account && <button onClick={() => setIsCashierOpen(true)} className="px-2.5 sm:px-4 py-2 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer">Cashier</button>}
           <button className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">☀️ <span className="hidden sm:inline">Light</span></button>
-          {account ? <div className="relative"><button onClick={() => setIsAccountMenuOpen((open) => !open)} className="rounded-xl border border-emerald-500/30 px-2.5 py-2 text-[10px] font-bold text-emerald-300 sm:px-3 sm:text-xs">{account.loginid}⌄</button>{isAccountMenuOpen && <div className="absolute right-0 top-12 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; return <button key={option.account_id} disabled={isActive || option.status !== 'active'} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}</div>}</div> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
+          {account ? <div className="relative"><button onClick={() => setIsAccountMenuOpen((open) => !open)} className="max-w-[116px] truncate rounded-xl border border-emerald-500/30 px-2 py-2 text-[10px] font-bold text-emerald-300 sm:max-w-none sm:px-3 sm:text-xs">{account.loginid}⌄</button>{isAccountMenuOpen && <div className="absolute right-0 top-12 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; return <button key={option.account_id} disabled={isActive || option.status !== 'active'} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}</div>}</div> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
           {!account && <a href="https://home.deriv.com/dashboard/signup?_gl=1*4zo6tf*_gcl_au*MTM1MjEzODExOS4xNzg3NzcxMjUx&residence=ke" target="_blank" rel="noreferrer" className="rounded-xl bg-teal-400 px-2.5 py-2 text-[10px] font-extrabold text-[#071217] transition hover:bg-teal-300 sm:px-4 sm:text-xs">Sign up</a>}
         </div>
       </header>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex min-h-16 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
         {navigationItems.map((item) => (
           <button
             key={item.id}
@@ -650,7 +650,7 @@ export default function App() {
 
       {/* Manual Trading View */}
       {currentTab === 'manual-trading' && (
-        <div className="flex flex-1 flex-col overflow-hidden pb-14 md:flex-row md:pb-0">
+        <div className="flex flex-1 flex-col overflow-hidden pb-16 md:flex-row md:pb-0">
           <main className="flex-1 min-w-0 flex flex-col bg-[#16161c] overflow-y-auto p-2 sm:p-6 space-y-2 sm:space-y-4">
             <div className="flex items-center justify-between bg-[#1b1b24] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-[#262633] shadow-md shrink-0">
               <div className="flex items-center space-x-3">
@@ -854,7 +854,7 @@ export default function App() {
 
       {/* Bot Builder Workspace View */}
       {currentTab === 'bot-builder' && (
-        <div className="flex flex-1 flex-col overflow-y-auto bg-[#f4f5f7] pb-14 text-gray-800 md:flex-row md:overflow-hidden md:pb-0">
+        <div className="flex flex-1 flex-col overflow-y-auto bg-[#f4f5f7] pb-16 text-gray-800 md:flex-row md:overflow-hidden md:pb-0">
           <div className="w-full bg-white border-b border-gray-200 flex flex-col shrink-0 shadow-sm md:w-64 md:border-b-0 md:border-r">
             <div className="p-3 border-b border-gray-200">
               <button 
