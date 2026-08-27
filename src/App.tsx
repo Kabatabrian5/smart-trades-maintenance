@@ -691,7 +691,7 @@ export default function App() {
 
       {/* Manual Trading View */}
       {currentTab === 'manual-trading' && (
-        <div className="flex flex-1 flex-col pb-16 md:flex-row md:overflow-hidden md:pb-0">
+        <div className="flex flex-1 flex-col overflow-y-auto pb-16 md:flex-row md:overflow-hidden md:pb-0">
           <main className="flex-1 min-w-0 flex flex-col bg-[#16161c] md:overflow-y-auto p-2 pb-28 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
             <div className="flex items-center justify-between bg-[#1b1b24] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-[#262633] shadow-md shrink-0">
               <div className="flex items-center space-x-3">
