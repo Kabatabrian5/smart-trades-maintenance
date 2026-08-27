@@ -29,14 +29,19 @@ export default async function handler(request: VercelRequest, response: VercelRe
       });
     }
 
-    // Return the OIDC access token directly as token1 so the WebSocket authorize method can use it
-    const accounts: Record<string, string> = {
-      token1: tokenData.access_token,
-      acct1: tokenData.local_id || tokenData.account_id || 'OIDC_USER',
-      cur1: 'USD'
+    // Provide every possible key name so frontend parsers (legacy or OIDC) succeed instantly
+    const accessToken = tokenData.access_token;
+    const payload = {
+      token1: accessToken,
+      access_token: accessToken,
+      token: accessToken,
+      acct1: tokenData.local_id || tokenData.account_id || 'CR_DEFAULT',
+      currency1: 'USD',
+      cur1: 'USD',
+      ...tokenData
     };
 
-    return response.status(200).json(accounts);
+    return response.status(200).json(payload);
   } catch (error) {
     console.error('Deriv token exchange request failed:', error);
     return response.status(502).json({ error: 'Unable to reach Deriv token service' });
