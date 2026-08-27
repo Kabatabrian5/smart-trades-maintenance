@@ -639,7 +639,7 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex min-h-16 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex h-16 min-h-16 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
         {navigationItems.map((item) => (
           <button
             key={item.id}
@@ -656,7 +656,7 @@ export default function App() {
       {/* Manual Trading View */}
       {currentTab === 'manual-trading' && (
         <div className="flex flex-1 flex-col overflow-hidden pb-16 md:flex-row md:pb-0">
-          <main className="flex-1 min-w-0 flex flex-col bg-[#16161c] overflow-y-auto p-2 sm:p-6 space-y-2 sm:space-y-4">
+          <main className="flex-1 min-w-0 flex flex-col bg-[#16161c] overflow-y-auto p-2 pb-28 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
             <div className="flex items-center justify-between bg-[#1b1b24] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-[#262633] shadow-md shrink-0">
               <div className="flex items-center space-x-3">
                 <span className={`w-3 h-3 rounded-full ${marketStatus.includes('Live') ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
