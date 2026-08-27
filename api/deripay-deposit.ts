@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const DERIPAY_BASE_URL = process.env.DERIPAY_BASE_URL || 'https://deripay.site';
 const DERIPAY_API_KEY = process.env.DERIPAY_API_KEY;
-const DERIV_APP_ID = process.env.DERIV_CLIENT_ID || process.env.VITE_DERIV_CLIENT_ID || '34bIcDF1RsEKSAbKFKimH';
+const DERIV_APP_ID = process.env.DERIV_APP_ID;
 
 function errorMessage(payload: unknown, fallback: string) {
   if (payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string') return payload.message;
@@ -14,6 +14,7 @@ function errorMessage(payload: unknown, fallback: string) {
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed' });
   if (!DERIPAY_API_KEY) return response.status(503).json({ error: 'Deripay is not configured' });
+  if (!DERIV_APP_ID || !/^\d+$/.test(DERIV_APP_ID)) return response.status(503).json({ error: 'A numeric DERIV_APP_ID is required for Deripay' });
 
   const { phoneNumber, usdAmount, loginid, userToken } = request.body || {};
   const amount = typeof usdAmount === 'number' ? usdAmount : Number(usdAmount);
