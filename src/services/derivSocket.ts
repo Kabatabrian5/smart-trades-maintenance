@@ -1,7 +1,6 @@
 // Deriv WebSocket Service supporting both 'tick' and 'history' message types
 const DERIV_WS_APP_ID = import.meta.env.VITE_DERIV_WS_APP_ID || '1089';
 const WS_URL = `wss://ws.derivws.com/websockets/v3?app_id=${encodeURIComponent(DERIV_WS_APP_ID)}`;
-const OIDC_CLIENT_ID = '34bIcDF1RsEKSAbKFKimH';
 
 class DerivSocketService {
   private ws: WebSocket | null = null;
