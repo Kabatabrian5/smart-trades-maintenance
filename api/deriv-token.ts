@@ -23,31 +23,31 @@ export default async function handler(request: VercelRequest, response: VercelRe
     });
 
     const tokenData = await tokenResponse.json().catch(() => ({}));
-    console.log('OIDC Token Response Keys:', Object.keys(tokenData));
-
-    if (!tokenResponse.ok) {
-      return response.status(tokenResponse.status).json({
+    if (!tokenResponse.ok || !tokenData.access_token) {
+      return response.status(tokenResponse.status || 502).json({
         error: tokenData.error_description || tokenData.error || 'Deriv token exchange failed',
       });
     }
 
-    if (!tokenData.access_token) {
-      return response.status(502).json({ error: 'Deriv did not return an access token' });
-    }
+    // Fetch user account information using the OIDC access token
+    const accountsResponse = await fetch('https://api.deriv.com/oauth2/accounts', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+    }).catch(() => null);
 
-    // Build accounts mapping directly from OIDC token response or user token properties
-    const accounts: Record<string, string> = {};
-    
-    // If Deriv passes account list in token response or we map access_token as token1
-    accounts.token1 = tokenData.access_token;
-    accounts.acct1 = tokenData.account_list?.[0]?.loginid || tokenData.local_id || tokenData.sub || 'CR_DEFAULT';
-    accounts.cur1 = tokenData.account_list?.[0]?.currency || 'USD';
+    const accountsData = accountsResponse ? await accountsResponse.json().catch(() => ({})) : {};
+    console.log('Accounts Data Response:', accountsData);
 
-    // If there are multiple accounts returned in tokenData
-    if (Array.isArray(tokenData.account_list)) {
-      tokenData.account_list.forEach((acc: any, idx: number) => {
+    const accounts: Record<string, string> = {
+      token1: tokenData.access_token,
+      acct1: accountsData.preferred_account || accountsData.accounts?.[0]?.loginid || 'CR_DEFAULT',
+      cur1: accountsData.accounts?.[0]?.currency || 'USD'
+    };
+
+    if (Array.isArray(accountsData.accounts)) {
+      accountsData.accounts.forEach((acc: any, idx: number) => {
         accounts[`acct${idx + 1}`] = acc.loginid;
-        accounts[`token${idx + 1}`] = acc.token || tokenData.access_token;
+        accounts[`token${idx + 1}`] = tokenData.access_token;
         accounts[`cur${idx + 1}`] = acc.currency || 'USD';
       });
     }
