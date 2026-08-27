@@ -384,3 +384,30 @@ Complete independent real/demo account discovery and balance subscriptions.
 Resolve empty Deriv active-symbol responses under modern routing.
 
 Implement secure deripay cashier integration.
+
+MegaTrades Reference Review
+On 27 August 2026, the logged-in MegaTrades Pro screen was reviewed as a UI reference. The observed account pattern is:
+
+- The active balance is displayed in the header beside Cashier.
+- Opening the balance control shows the active balance, a `Switch account` label, and both Real and Demo rows.
+- Each row shows account type, account ID, and balance. The active account is disabled; selecting the other row switches the active account and refreshes the header balance.
+- Cashier uses the currently selected account and opens as a modal dialog.
+
+The observed Cashier pattern is:
+
+- Header shows Cashier, the selected account ID, Refresh, and Close.
+- Balance shows USD and a KES equivalent.
+- Tabs are Deposit, Withdraw, and History.
+- Deposit and Withdraw use an M-Pesa phone field, USD amount field, amount presets, and a primary action button.
+- History has an explicit empty state when no transactions exist.
+- The UI displays DeriPay branding, but the payment processor must remain server-side.
+
+Planned secure payment flow for Smart Trades:
+
+1. Client submits account, phone, amount, currency, and an idempotency key to a same-origin Vercel payment-initiation endpoint.
+2. The server validates the authenticated user, amount limits, currency, phone format, and active account before calling DeriPay with server-only merchant credentials.
+3. DeriPay initiates the M-Pesa prompt and returns a provider reference; the server stores a pending payment record without exposing credentials.
+4. DeriPay calls a webhook endpoint; the server verifies the webhook signature, rejects duplicates, reconciles the provider reference, and records the final status.
+5. Smart Trades polls a same-origin payment-status endpoint or receives a server-mediated update, then refreshes the Deriv balance only after confirmed settlement.
+
+Do not copy another site's credentials, private account data, or payment implementation. DeriPay merchant credentials, webhook secrets, and M-Pesa integration keys must never be placed in browser code or `VITE_` variables. The next implementation step is a provider-agnostic payment record and API contract, followed by DeriPay integration once merchant documentation and credentials are available.
