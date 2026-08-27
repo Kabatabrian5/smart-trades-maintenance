@@ -761,7 +761,7 @@ export default function App() {
             </div>
           </main>
 
-          <aside className="w-full sm:w-80 bg-[#121217] border-t sm:border-t-0 sm:border-l border-[#22222c] flex flex-col h-auto sm:h-full text-white p-3 sm:p-5 justify-between shrink-0 gap-3 sm:gap-0">
+          <aside className="w-full sm:w-80 bg-[#121217] border-t sm:border-t-0 sm:border-l border-[#22222c] flex flex-col h-auto sm:h-full text-white p-3 pb-28 sm:p-5 sm:pb-5 justify-between shrink-0 gap-3 sm:gap-0">
             <div className="space-y-3 sm:space-y-4">
               {account && <div className="text-right text-sm font-extrabold text-emerald-400">{account.balance === null ? 'Loading balance...' : `${account.balance.toFixed(2)} ${account.currency}`}</div>}
               <div className="flex items-center justify-between text-xs font-bold uppercase text-gray-400 border-b border-[#22222c] pb-2">
