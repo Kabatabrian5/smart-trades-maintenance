@@ -377,13 +377,15 @@ During a production login test on 27 August 2026, OAuth returned to Smart Trades
 
 Still Needs Work:
 Deploy and repeat the production login test after the balance normalization fix.
-Finalize server-side routing for modern account listing and OTP generation to prevent browser CORS crashes.
+Verify the deployed server-side modern account and OTP routing in production.
 
-Complete independent real/demo account discovery and balance subscriptions.
+Complete independent real/demo balance subscriptions and account-name lookup if Deriv provides a verified identity endpoint.
 
 Resolve empty Deriv active-symbol responses under modern routing.
 
-Implement secure deripay cashier integration.
+Complete Deripay transaction status polling/webhooks and withdrawal confirmation flow.
+
+Latest status update: the mobile header now labels the active account as `Real` or `Demo` and displays its current balance and currency. The account dropdown retains the full account IDs and lets users switch accounts through a fresh OTP WebSocket connection. Deripay deposits are now wired through the signed server-side deposit proxy; withdrawals, transaction polling/webhooks, and final production payment verification remain outstanding.
 
 MegaTrades Reference Review
 On 27 August 2026, the logged-in MegaTrades Pro screen was reviewed as a UI reference. The observed account pattern is:
