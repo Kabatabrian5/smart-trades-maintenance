@@ -29,28 +29,12 @@ export default async function handler(request: VercelRequest, response: VercelRe
       });
     }
 
-    // Fetch user account information using the OIDC access token
-    const accountsResponse = await fetch('https://api.deriv.com/oauth2/accounts', {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
-    }).catch(() => null);
-
-    const accountsData = accountsResponse ? await accountsResponse.json().catch(() => ({})) : {};
-    console.log('Accounts Data Response:', accountsData);
-
+    // Return the OIDC access token directly as token1 so the WebSocket authorize method can use it
     const accounts: Record<string, string> = {
       token1: tokenData.access_token,
-      acct1: accountsData.preferred_account || accountsData.accounts?.[0]?.loginid || 'CR_DEFAULT',
-      cur1: accountsData.accounts?.[0]?.currency || 'USD'
+      acct1: tokenData.local_id || tokenData.account_id || 'OIDC_USER',
+      cur1: 'USD'
     };
-
-    if (Array.isArray(accountsData.accounts)) {
-      accountsData.accounts.forEach((acc: any, idx: number) => {
-        accounts[`acct${idx + 1}`] = acc.loginid;
-        accounts[`token${idx + 1}`] = tokenData.access_token;
-        accounts[`cur${idx + 1}`] = acc.currency || 'USD';
-      });
-    }
 
     return response.status(200).json(accounts);
   } catch (error) {
