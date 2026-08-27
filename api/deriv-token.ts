@@ -42,6 +42,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     });
 
     const legacyText = await legacyResponse.text();
+    const legacyContentType = legacyResponse.headers.get('content-type') || '';
     let legacyData: Record<string, unknown> = {};
     try {
       legacyData = legacyText ? JSON.parse(legacyText) : {};
@@ -54,8 +55,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
       && legacyKeys.some((key) => /^acct\d+$/.test(key));
 
     if (!legacyResponse.ok || !hasAccountTokens) {
-      // Surface field names only (never token values) so we can align the parser
-      // with whatever shape Deriv is actually returning, without logging secrets.
+      // Surface field names and a safe body preview (never real token values) so we can
+      // align the parser with whatever shape Deriv is actually returning.
       // IMPORTANT: always respond with a non-200 status here, even if Deriv itself
       // returned 200, otherwise the frontend treats this diagnostic body as success.
       const status = legacyResponse.ok ? 502 : (legacyResponse.status || 502);
@@ -64,7 +65,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
         deriv_error: (legacyData as { error?: string; error_description?: string }).error_description
           || (legacyData as { error?: string }).error
           || undefined,
-        response_keys: Object.keys(legacyData),
+        response_keys: legacyKeys,
+        legacy_status: legacyResponse.status,
+        legacy_content_type: legacyContentType,
+        // Safe because this only runs when no account tokens were found in the body.
+        legacy_body_preview: legacyText.slice(0, 500),
       });
     }
 
