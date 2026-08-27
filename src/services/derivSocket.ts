@@ -1,7 +1,6 @@
 // Deriv WebSocket Service supporting both 'tick' and 'history' message types
-const DERIV_APP_ID = import.meta.env.VITE_DERIV_WS_APP_ID || '1089';
+const DERIV_APP_ID = import.meta.env.VITE_DERIV_WS_APP_ID || '34bIcDF1RsEKSAbKFKimH';
 const WS_URL = `wss://ws.derivws.com/websockets/v3?app_id=${encodeURIComponent(DERIV_APP_ID)}`;
-const API_TOKEN = import.meta.env.VITE_DERIV_API_TOKEN as string | undefined;
 
 class DerivSocketService {
   private ws: WebSocket | null = null;
@@ -9,13 +8,34 @@ class DerivSocketService {
   private pendingRequests: Map<string, { resolve: Function; reject: Function }> = new Map();
   private requestQueue: any[] = [];
   public onConnectionChange?: (status: string) => void;
-  private apiToken: string | undefined = API_TOKEN;
+  private apiToken: string | undefined = undefined;
 
   constructor() {
+    this.loadToken();
     this.connect();
   }
 
+  private loadToken() {
+    // Check localStorage for OAuth tokens saved during login callback
+    try {
+      const localToken = localStorage.getItem('token1') || localStorage.getItem('access_token') || localStorage.getItem('deriv_access_token');
+      if (localToken) {
+        this.apiToken = localToken;
+        return;
+      }
+      // Fallback to environment variable if available
+      const envToken = import.meta.env.VITE_DERIV_API_TOKEN as string | undefined;
+      if (envToken) {
+        this.apiToken = envToken;
+      }
+    } catch (e) {
+      console.error('Failed to load token from storage:', e);
+    }
+  }
+
   public connect() {
+    this.loadToken(); // Refresh token check before connecting
+
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -67,7 +87,10 @@ class DerivSocketService {
   }
 
   public async authorize(token?: string) {
-    if (token) this.apiToken = token;
+    if (token) {
+      this.apiToken = token;
+      localStorage.setItem('token1', token);
+    }
     if (!this.apiToken) return null;
 
     try {
