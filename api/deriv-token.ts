@@ -29,7 +29,16 @@ function findLegacyAccounts(value: unknown, accounts: Record<string, string> = {
     return accounts;
   }
 
-  Object.values(record).forEach((item) => findLegacyAccounts(item, accounts, index));
+  Object.entries(record).forEach(([key, item]) => {
+    if (/^(CR|CRW|MF|MFW|VR|VRT|VRW)\w+$/i.test(key) && typeof item === 'string') {
+      index.value += 1;
+      accounts[`acct${index.value}`] = key;
+      accounts[`token${index.value}`] = item;
+      accounts[`cur${index.value}`] = 'USD';
+      return;
+    }
+    findLegacyAccounts(item, accounts, index);
+  });
   return accounts;
 }
 
