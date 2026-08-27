@@ -12,6 +12,13 @@ function findLegacyAccounts(value: unknown, accounts: Record<string, string> = {
   }
 
   const record = value as TokenRecord;
+  if (typeof record.acct1 === 'string' && typeof record.token1 === 'string') {
+    return Object.keys(record).reduce((tokens: Record<string, string>, key) => {
+      const item = record[key];
+      if (typeof item === 'string') tokens[key] = item;
+      return tokens;
+    }, {});
+  }
   const loginid = record.loginid || record.acct || record.account || record.account_id;
   const token = record.token || record.oauth_token || record.session_token || record.access_token;
   if (typeof loginid === 'string' && typeof token === 'string') {

@@ -285,7 +285,22 @@ This means the authorization redirect is working. The remaining issue is after c
 - The returned OAuth token cannot be used with the legacy WebSocket `authorize` method.
 - The production callback or client ID differs from the registered values.
 
-The frontend currently shows a generic authorization error. The next debugging step should expose the actual API response from `/api/deriv-token` and inspect Vercel function logs.
+The current production failure is:
+
+```text
+Deriv login could not be completed: Deriv returned no usable account session token
+```
+
+The browser reaches Deriv login and consent successfully, then `/api/deriv-token` returns HTTP 502 while converting the OIDC access token into legacy account session tokens. The app accepts alphanumeric client IDs such as `CR...`, `VRTC...`, `MF...`, and `CRW...`; the `1` in `acct1` and `token1` is only the account position, not a numeric client ID requirement.
+
+Deriv's official `@deriv-com/auth-client` performs this sequence:
+
+1. `requestOidcAuthentication` redirects to the current OIDC endpoint.
+2. `requestOidcToken` exchanges the callback code for an OIDC access token.
+3. `requestLegacyToken` sends that access token to `/oauth2/legacy/tokens`.
+4. The returned legacy token fields are passed to WebSocket `authorize`.
+
+Smart Trades currently implements steps 1 and 2 and calls `/oauth2/legacy/tokens`, but the returned response does not match the known `acct1/token1/cur1` shape. The next debugging step is to inspect the non-secret response field names and align the parser with the exact production response. Do not log or expose token values.
 
 ## Balances
 
@@ -414,7 +429,7 @@ npm run build
 
 ## Where We Have Reached
 
-As of 26 August 2026, the project has reached this point:
+As of 27 August 2026, the project has reached this point:
 
 1. The maintenance repository has been replaced with the Smart Trades application.
 2. The application source is saved in GitHub at `Kabatabrian5/smart-trades-maintenance`.
@@ -425,11 +440,12 @@ As of 26 August 2026, the project has reached this point:
 7. Positions records only real Deriv buy responses; fake trades were removed.
 8. Fake market ticks were removed; the app now reports market connection failures.
 9. Deriv OAuth now reaches the login and Smart Trades authorization screens.
-10. The remaining OAuth issue occurs after the user authorizes, during token exchange or WebSocket authorization.
-11. The remaining market issue is Deriv returning an empty active-symbol list and `InvalidSymbol` for the current symbols.
-12. Real/Demo balances and Cashier UI exist, but account discovery, fully independent balances, and DuduPay payment processing are not complete.
+10. The current OAuth request reaches the modern Deriv consent screen and returns an OIDC code to `smart-trades.site`.
+11. The current OAuth issue is the server-side legacy-token conversion returning an unexpected response shape and HTTP 502; repeated attempts consume one-time OAuth codes.
+12. The app's real-market WebSocket implementation from commit `8025c63` remains in `src/services/derivSocket.ts` and `src/hooks/useDerivSocket.ts`; fresh production pages have shown `Status: Live`, while some catalog symbols still return `InvalidSymbol`.
+13. Real/Demo balances and Cashier UI exist, but account discovery, fully independent balances, and DuduPay payment processing are not complete.
 
-The next work should begin with production OAuth diagnostics, then live symbol discovery, then independent Real/Demo account balances and secure Cashier/DuduPay integration.
+The next work should begin by matching the exact `/oauth2/legacy/tokens` production response to Deriv's official auth-client behavior, then live symbol discovery, then independent Real/Demo account balances and secure Cashier/DuduPay integration.
 
 Completed:
 
@@ -451,10 +467,14 @@ Completed:
 - Added server-side OAuth token exchange.
 - Added Real/Demo balance UI.
 - Set the exact Deriv login and signup destinations.
+- Compared the OAuth and live-market files with commits `e07c0cc` and `8025c63`.
+- Confirmed the current login uses `https://auth.deriv.com/oauth2/auth` with PKCE.
+- Added server-side legacy-token conversion and safe response diagnostics.
+- Pushed OAuth changes to GitHub in commits `edefcc5`, `7c1dd16`, and `d76faf4`.
 
 Still needs work:
 
-- Diagnose post-consent OAuth login failure.
+- Diagnose the unexpected `/oauth2/legacy/tokens` response shape without exposing token values.
 - Verify Vercel OAuth environment variables.
 - Complete independent real/demo account discovery.
 - Complete independent real/demo balance subscriptions.
