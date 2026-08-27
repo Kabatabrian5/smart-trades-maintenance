@@ -32,7 +32,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
     const accessToken = tokenData.access_token as string;
 
-    // Step 22: exchange the OIDC access token for legacy account session tokens.
+    // Step 2: exchange the OIDC access token for legacy account session tokens.
     // The legacy WebSocket `authorize` call does not accept an OIDC bearer token directly;
     // it needs the acct1/token1/cur1-style tokens returned by this endpoint.
     // This mirrors requestLegacyToken() in @deriv-com/auth-client.
@@ -49,12 +49,17 @@ export default async function handler(request: VercelRequest, response: VercelRe
       // Non-JSON body from Deriv; fall through and report diagnostics below.
     }
 
-    const hasAccountTokens = Object.keys(legacyData).some((key) => /^token\d+$/.test(key));
+    const legacyKeys = Object.keys(legacyData);
+    const hasAccountTokens = legacyKeys.some((key) => /^token\d+$/.test(key))
+      && legacyKeys.some((key) => /^acct\d+$/.test(key));
 
     if (!legacyResponse.ok || !hasAccountTokens) {
       // Surface field names only (never token values) so we can align the parser
       // with whatever shape Deriv is actually returning, without logging secrets.
-      return response.status(legacyResponse.status || 502).json({
+      // IMPORTANT: always respond with a non-200 status here, even if Deriv itself
+      // returned 200, otherwise the frontend treats this diagnostic body as success.
+      const status = legacyResponse.ok ? 502 : (legacyResponse.status || 502);
+      return response.status(status).json({
         error: 'Deriv did not return usable legacy account tokens',
         deriv_error: (legacyData as { error?: string; error_description?: string }).error_description
           || (legacyData as { error?: string }).error
