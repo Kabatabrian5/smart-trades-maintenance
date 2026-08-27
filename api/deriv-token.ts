@@ -32,7 +32,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
     const accessToken = tokenData.access_token as string;
 
-    // Step 2: exchange the OIDC access token for legacy account session tokens.
+    // Step 22: exchange the OIDC access token for legacy account session tokens.
     // The legacy WebSocket `authorize` call does not accept an OIDC bearer token directly;
     // it needs the acct1/token1/cur1-style tokens returned by this endpoint.
     // This mirrors requestLegacyToken() in @deriv-com/auth-client.
