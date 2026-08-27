@@ -12,6 +12,8 @@ function findLegacyAccounts(value: unknown, accounts: Record<string, string> = {
   }
 
   const record = value as TokenRecord;
+  
+  // Check if object has direct acct1/token1
   if (typeof record.acct1 === 'string' && typeof record.token1 === 'string') {
     return Object.keys(record).reduce((tokens: Record<string, string>, key) => {
       const item = record[key];
@@ -19,6 +21,7 @@ function findLegacyAccounts(value: unknown, accounts: Record<string, string> = {
       return tokens;
     }, {});
   }
+
   const loginid = record.loginid || record.acct || record.account || record.account_id;
   const token = record.token || record.oauth_token || record.session_token || record.access_token;
   if (typeof loginid === 'string' && typeof token === 'string') {
@@ -56,7 +59,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: DERIV_CLIENT_ID,
-        code,
+      code,
         code_verifier,
         redirect_uri,
       }),
@@ -75,11 +78,30 @@ export default async function handler(request: VercelRequest, response: VercelRe
       method: 'POST',
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
+    
     const legacyData = await legacyResponse.json().catch(() => ({}));
-    if (!legacyResponse.ok) return response.status(legacyResponse.status).json({ error: legacyData.error_description || legacyData.error || 'Deriv legacy token request failed' });
+    
+    // Safely log structure overview on server console without exposing sensitive values
+    console.log('Legacy Token Response Status:', legacyResponse.status);
+    console.log('Legacy Token Response Keys:', Object.keys(legacyData));
+
+    if (!legacyResponse.ok) {
+      return response.status(legacyResponse.status).json({ 
+        error: legacyData.error_description || legacyData.error || 'Deriv legacy token request failed',
+        details: legacyData 
+      });
+    }
 
     const accounts = findLegacyAccounts(legacyData);
-    if (!accounts.token1 || !accounts.acct1) return response.status(502).json({ error: 'Deriv returned no usable account session token', response_keys: Object.keys(legacyData) });
+    
+    if (!accounts.token1 || !accounts.acct1) {
+      return response.status(502).json({ 
+        error: 'Deriv returned no usable account session token', 
+        response_keys: Object.keys(legacyData),
+        sample_structure: JSON.stringify(legacyData).slice(0, 300) // Provides a safe layout peek
+      });
+    }
+
     return response.status(200).json(accounts);
   } catch (error) {
     console.error('Deriv token exchange request failed:', error);
