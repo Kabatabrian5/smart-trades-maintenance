@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import PositionsDrawer from './components/layout/PositionsDrawer';
 import { useDerivSocket } from './hooks/useDerivSocket';
 import { derivService } from './services/derivSocket';
+import { fetchOptionsAccounts, requestAccountWebSocketUrl, pickPrimaryAccount } from './services/derivAccounts';
 
 const VOLATILITY_MARKETS = [
   { id: '1HZ10V', name: 'Volatility 10 (1s) Index' },
@@ -142,32 +143,11 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const legacyToken = params.get('token1');
-    const legacyLoginid = params.get('acct1');
-    const legacyCurrency = params.get('cur1') || 'USD';
-    const accounts = Array.from({ length: 20 }, (_, index) => {
-      const accountNumber = index + 1;
-      const token = params.get(`token${accountNumber}`);
-      const loginid = params.get(`acct${accountNumber}`);
-      if (!token || !loginid) return null;
-      return { token, loginid, currency: params.get(`cur${accountNumber}`) || 'USD' };
-    }).filter((item): item is { token: string; loginid: string; currency: string } => item !== null);
 
-    if (legacyToken && legacyLoginid && !accounts.length) {
-      accounts.push({ token: legacyToken, loginid: legacyLoginid, currency: legacyCurrency });
-    }
-
-    if (accounts.length) {
-      void authorizeAccount(accounts[0].token, accounts[0].loginid, accounts[0].currency).catch((error: unknown) => {
-        setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed');
-        setAuthStatus('failed');
-      });
-      window.history.replaceState({}, document.title, window.location.pathname);
-      return;
-    }
     if (params.get('error')) {
       setAuthError(params.get('error_description') || params.get('error') || 'Deriv authorization was denied');
       setAuthStatus('failed');
+      window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
     const code = params.get('code');
@@ -180,27 +160,13 @@ export default function App() {
     let isMounted = true;
     setAuthStatus('authorizing');
     fetch('/api/deriv-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, code_verifier: sessionStorage.getItem('deriv_pkce_verifier'), redirect_uri: window.location.origin }) }).then(async (response) => {
-      const errorResponse = await response.clone().json().catch(() => ({})) as {
-        error?: string;
-        response_keys?: string[];
-        deriv_error?: string;
-        legacy_status?: number;
-        legacy_content_type?: string;
-        legacy_body_preview?: string;
-      };
+      const errorResponse = await response.clone().json().catch(() => ({})) as { error?: string };
       if (!response.ok) {
-        const details = [
-          errorResponse.deriv_error,
-          errorResponse.response_keys?.length ? `fields: ${errorResponse.response_keys.join(', ')}` : '',
-          errorResponse.legacy_status !== undefined ? `legacy status: ${errorResponse.legacy_status}` : '',
-          errorResponse.legacy_content_type ? `content-type: ${errorResponse.legacy_content_type}` : '',
-          errorResponse.legacy_body_preview ? `body: ${errorResponse.legacy_body_preview.slice(0, 200)}` : '',
-        ].filter(Boolean).join(' | ');
-        throw new Error([errorResponse.error || `Token exchange failed (${response.status})`, details].filter(Boolean).join(' - '));
+        throw new Error(errorResponse.error || `Token exchange failed (${response.status})`);
       }
-      const tokenResponse = await response.json() as { token1?: string; acct1?: string; cur1?: string };
-      if (!tokenResponse.token1 || !tokenResponse.acct1) throw new Error('Deriv returned no usable account session token');
-      await authorizeAccount(tokenResponse.token1, tokenResponse.acct1, tokenResponse.cur1 || 'USD');
+      const tokenResponse = await response.json() as { access_token?: string };
+      if (!tokenResponse.access_token) throw new Error('Deriv returned no usable access token');
+      await authorizeWithAccessToken(tokenResponse.access_token);
       sessionStorage.removeItem('deriv_pkce_verifier');
       sessionStorage.removeItem('deriv_oauth_state');
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -216,12 +182,24 @@ export default function App() {
     };
   }, []);
 
-  async function authorizeAccount(token: string, loginid: string, currency: string) {
-    const response = await derivService.authorize(token);
-    if (response?.error) {
-      throw new Error(response.error.message || response.error.code || 'Deriv WebSocket authorization failed');
-    }
-    const nextAccount: DerivAccount = { loginid, token, currency, balance: null };
+  // Deriv's current Options API: an OIDC access token doesn't authenticate a WebSocket
+  // connection directly. Instead we list the user's accounts, mint a one-time-password
+  // WebSocket URL for the chosen account, and connect straight to that (no `authorize`
+  // message needed — the OTP in the URL does it).
+  async function authorizeWithAccessToken(accessToken: string) {
+    const accounts = await fetchOptionsAccounts(accessToken, DERIV_CLIENT_ID);
+    const primary = pickPrimaryAccount(accounts);
+    if (!primary) throw new Error('Deriv account list was empty');
+
+    const wsUrl = await requestAccountWebSocketUrl(accessToken, DERIV_CLIENT_ID, primary.account_id);
+    derivService.connectToUrl(wsUrl);
+
+    const nextAccount: DerivAccount = {
+      loginid: primary.account_id,
+      token: accessToken,
+      currency: primary.currency,
+      balance: primary.balance,
+    };
     sessionStorage.setItem('smart-trades-account', JSON.stringify(nextAccount));
     setAccount(nextAccount);
     setAuthStatus('idle');
