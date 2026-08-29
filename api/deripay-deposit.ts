@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { DERIPAY_API_KEY, deripayErrorMessage, deripayFetch } from './_lib/deripay';
+import { DERIPAY_API_KEY, deripayErrorMessage, deripayFetch } from './_lib/deripay.js';
 
 const DERIV_APP_ID = process.env.DERIV_APP_ID;
 
