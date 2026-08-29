@@ -1,12 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { DERIPAY_API_KEY, deripayErrorMessage, deripayFetch } from './_lib/deripay.js';
 
-const DERIV_APP_ID = process.env.DERIV_APP_ID;
+// Deriv's current OIDC app registration issues an alphanumeric app ID (the same value used
+// as the OAuth client_id) — it no longer hands out separate numeric app IDs to new apps.
+// DERIV_APP_ID lets you override this explicitly (e.g. if Deripay confirms it needs a
+// different/legacy numeric ID for your merchant binding), but defaults to the real app ID.
+const DERIV_APP_ID = process.env.DERIV_APP_ID || process.env.DERIV_CLIENT_ID || process.env.VITE_DERIV_CLIENT_ID;
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== 'POST') return response.status(405).json({ error: 'Method not allowed' });
   if (!DERIPAY_API_KEY) return response.status(503).json({ error: 'Deripay is not configured' });
-  if (!DERIV_APP_ID || !/^\d+$/.test(DERIV_APP_ID)) return response.status(503).json({ error: 'A numeric DERIV_APP_ID is required for Deripay' });
+  if (!DERIV_APP_ID) return response.status(503).json({ error: 'DERIV_APP_ID or DERIV_CLIENT_ID is required for Deripay' });
 
   const { phoneNumber, usdAmount, loginid, userToken } = request.body || {};
   const amount = typeof usdAmount === 'number' ? usdAmount : Number(usdAmount);
