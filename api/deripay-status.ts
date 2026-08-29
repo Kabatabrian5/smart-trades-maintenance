@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { DERIPAY_API_KEY, deripayErrorMessage, deripayFetch } from './_lib/deripay';
+import { DERIPAY_API_KEY, deripayErrorMessage, deripayFetch } from './_lib/deripay.js';
 
 // GET /api/deripay-status?transactionId=... — checks a Deripay transaction's real settlement
 // state. Used both for polling after a deposit prompt and for populating the History tab.
