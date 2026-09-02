@@ -70,9 +70,12 @@ interface Position {
   symbol: string;
   contract: string;
   stake: number;
-  status: 'Pending' | 'Open' | 'Settled';
+  duration: number;
+  ticksElapsed?: number;
+  contractValue?: number;
   payout?: number;
   profit?: number;
+  status: 'Pending' | 'Open' | 'Settled';
   result?: 'won' | 'lost';
 }
 
@@ -694,6 +697,7 @@ export default function App() {
           symbol: selectedSymbol,
           contract: contractType,
           stake,
+          duration: ticksCount,
           status: 'Open',
         };
         setPositions((current) => {
@@ -703,6 +707,7 @@ export default function App() {
         });
         await derivService.subscribeToContract(String(buyRes.buy.contract_id));
         await derivService.refreshBalance();
+        setCurrentTab('positions');
         alert(`Digit Trade executed! Contract ID: ${buyRes.buy.contract_id}`);
       }
 
@@ -719,29 +724,41 @@ export default function App() {
         contract_id?: number | string;
         is_sold?: number;
         status?: string;
+        tick_count?: number | string;
+        bid_price?: number | string;
         payout?: number | string;
         buy_price?: number | string;
         profit?: number | string;
       };
     }) => {
       const contract = data.proposal_open_contract;
-      if (!contract?.contract_id || (!contract.is_sold && contract.status !== 'sold')) return;
+      if (!contract?.contract_id) return;
 
       const contractId = String(contract.contract_id);
+      const ticksElapsed = normalizeBalance(contract.tick_count);
+      const contractValue = normalizeBalance(contract.bid_price);
       const payout = normalizeBalance(contract.payout) ?? 0;
       const buyPrice = normalizeBalance(contract.buy_price) ?? 0;
       const profit = normalizeBalance(contract.profit) ?? payout - buyPrice;
+      const settled = Boolean(contract.is_sold) || contract.status === 'sold';
       const result: 'won' | 'lost' = profit >= 0 ? 'won' : 'lost';
 
       setPositions((current) => {
         const updatedPositions = current.map((position) => position.id === contractId
-          ? { ...position, status: 'Settled' as const, payout, profit, result }
+          ? {
+              ...position,
+              ...(ticksElapsed === null ? {} : { ticksElapsed }),
+              ...(contractValue === null ? {} : { contractValue }),
+              payout,
+              profit,
+              ...(settled ? { status: 'Settled' as const, result } : {}),
+            }
           : position);
         sessionStorage.setItem('smart-trades-positions', JSON.stringify(updatedPositions));
         return updatedPositions;
       });
 
-      derivService.refreshBalance().catch(() => {});
+      if (settled) derivService.refreshBalance().catch(() => {});
     });
 
     return unsubscribeContract;
@@ -924,7 +941,7 @@ export default function App() {
             <div className="flex items-center justify-between border-b border-[#252630] px-4 py-4 sm:px-6"><div><p className="text-lg font-extrabold">Positions</p><p className="mt-1 text-[10px] text-gray-500">Recorded trading activity</p></div><span className="text-gray-500">×</span></div>
             <div className="grid grid-cols-3 border-b border-[#252630]">{(['summary', 'transactions', 'journal'] as const).map((tab) => <button key={tab} onClick={() => setPositionsPanelTab(tab)} className={`border-b-2 px-2 py-3 text-xs font-semibold capitalize transition-colors ${positionsPanelTab === tab ? 'border-rose-500 text-white' : 'border-transparent text-gray-500 hover:text-gray-200'}`}>{tab}</button>)}</div>
             {positionsPanelTab === 'summary' && <>
-              {positions.length === 0 ? <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center px-6 text-center"><div className="grid h-12 w-12 place-items-center rounded-xl border border-[#30313c] bg-[#1b1c25] text-lg">▥</div><p className="mt-4 text-sm font-bold text-gray-200">No positions yet</p><p className="mt-1 text-[10px] text-gray-500">Completed or open trades will appear here.</p></div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => <div key={position.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div><p className="font-bold">{position.symbol}</p><p className="text-xs text-gray-400">{position.contract} · Contract #{position.id}</p></div><div className="text-right"><p className="font-bold">{position.stake.toFixed(2)} USD</p><p className="text-xs text-emerald-400">{position.status}</p></div></div>)}</div>}
+              {positions.length === 0 ? <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center px-6 text-center"><div className="grid h-12 w-12 place-items-center rounded-xl border border-[#30313c] bg-[#1b1c25] text-lg">▥</div><p className="mt-4 text-sm font-bold text-gray-200">No positions yet</p><p className="mt-1 text-[10px] text-gray-500">Completed or open trades will appear here.</p></div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => { const profit = position.profit ?? 0; const isSettled = position.status === 'Settled'; return <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-bold">{position.symbol}</p><p className="text-xs text-gray-400">{position.contract} · Contract #{position.id}</p></div><p className={`text-xs font-bold ${isSettled ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}`}>{position.status}</p></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><div><p className="text-[9px] uppercase text-gray-500">Ticks</p><p className="font-bold">{position.ticksElapsed ?? 0}/{position.duration}</p></div><div><p className="text-[9px] uppercase text-gray-500">P/L</p><p className={`font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{profit.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Contract value</p><p className="font-bold">{(position.contractValue ?? position.stake).toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Potential payout</p><p className="font-bold">{(position.payout ?? 0).toFixed(2)} USD</p></div></div></div>; })}</div>}
               <div className="border-t border-[#252630] px-4 py-5 sm:px-6"><div className="grid grid-cols-3 gap-y-5 text-center"><div><p className="text-[9px] uppercase text-gray-500">Total stake</p><p className="text-xs font-bold">{positions.reduce((total, position) => total + position.stake, 0).toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Total payout</p><p className="text-xs font-bold">0.00 USD</p></div><div><p className="text-[9px] uppercase text-gray-500">No. of runs</p><p className="text-xs font-bold">{positions.length}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts lost</p><p className="text-xs font-bold">0</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts won</p><p className="text-xs font-bold">0</p></div><div><p className="text-[9px] uppercase text-gray-500">Total profit/loss</p><p className="text-xs font-bold text-emerald-400">0.00 USD</p></div></div><button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="mt-5 w-full rounded-xl border border-[#363744] bg-[#1d1e27] py-2.5 text-xs font-bold text-gray-200 transition hover:border-rose-400 hover:text-white">Reset</button></div>
             </>}
             {positionsPanelTab === 'transactions' && <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No active contract transactions yet.</div>}

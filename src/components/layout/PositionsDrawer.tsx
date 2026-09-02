@@ -5,7 +5,13 @@ interface Position {
   symbol: string;
   contract: string;
   stake: number;
+  duration: number;
+  ticksElapsed?: number;
+  contractValue?: number;
+  payout?: number;
+  profit?: number;
   status: 'Pending' | 'Open' | 'Settled';
+  result?: 'won' | 'lost';
 }
 
 export default function PositionsDrawer({ positions }: { positions: Position[] }) {
@@ -56,7 +62,7 @@ export default function PositionsDrawer({ positions }: { positions: Position[] }
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-3 text-gray-500">
-        {positions.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-[#262633] bg-[#1a1a22] text-gray-400 shadow-inner">📊</div><p className="text-xs font-medium text-gray-400">No positions yet</p><p className="mt-1 text-[10px] text-gray-600">Completed or open trades will appear here.</p></div> : <div className="space-y-2">{positions.map((position) => <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1a1a22] p-3 text-xs"><div className="flex justify-between gap-2"><span className="font-bold text-white">{position.symbol}</span><span className="text-emerald-400">{position.status}</span></div><div className="mt-1 text-gray-500">{position.contract} · #{position.id}</div><div className="mt-2 text-gray-300">Stake {position.stake.toFixed(2)} USD</div></div>)}</div>}
+        {positions.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-[#262633] bg-[#1a1a22] text-gray-400 shadow-inner">📊</div><p className="text-xs font-medium text-gray-400">No positions yet</p><p className="mt-1 text-[10px] text-gray-600">Completed or open trades will appear here.</p></div> : <div className="space-y-2">{positions.map((position) => { const profit = position.profit ?? 0; return <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1a1a22] p-3 text-xs"><div className="flex justify-between gap-2"><span className="font-bold text-white">{position.symbol}</span><span className={position.status === 'Settled' ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}>{position.status}</span></div><div className="mt-1 text-gray-500">{position.contract} · #{position.id}</div><div className="mt-2 grid grid-cols-2 gap-2 text-[11px]"><span>Tick {position.ticksElapsed ?? 0}/{position.duration}</span><span className={profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}>P/L {profit.toFixed(2)} USD</span><span>Value {(position.contractValue ?? position.stake).toFixed(2)} USD</span><span>Payout {(position.payout ?? 0).toFixed(2)} USD</span></div></div>; })}</div>}
       </div>
 
       {/* Footer Run Statistics */}
