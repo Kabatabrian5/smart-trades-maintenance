@@ -123,6 +123,14 @@ class DerivSocketService {
   public async buyContract(proposalId: string, price: number) {
     return this.send({ buy: proposalId, price: price });
   }
+
+  public async refreshBalance() {
+    return this.send({ balance: 1 });
+  }
+
+  public async subscribeToContract(contractId: string) {
+    return this.send({ proposal_open_contract: 1, contract_id: Number(contractId), subscribe: 1 });
+  }
 }
 
 export const derivService = new DerivSocketService();

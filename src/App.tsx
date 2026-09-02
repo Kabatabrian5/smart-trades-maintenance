@@ -71,6 +71,9 @@ interface Position {
   contract: string;
   stake: number;
   status: 'Pending' | 'Open' | 'Settled';
+  payout?: number;
+  profit?: number;
+  result?: 'won' | 'lost';
 }
 
 interface CashierTransaction {
@@ -696,12 +699,51 @@ export default function App() {
           sessionStorage.setItem('smart-trades-positions', JSON.stringify(updatedPositions));
           return updatedPositions;
         });
+        await derivService.subscribeToContract(String(buyRes.buy.contract_id));
+        await derivService.refreshBalance();
         alert(`Digit Trade executed! Contract ID: ${buyRes.buy.contract_id}`);
       }
+
     } catch (error: any) {
       alert(`Trade failed: ${error.message || 'Unknown error'}`);
     }
   };
+
+  useEffect(() => {
+    if (!account) return;
+
+    const unsubscribeContract = derivService.subscribe('proposal_open_contract', (data: {
+      proposal_open_contract?: {
+        contract_id?: number | string;
+        is_sold?: number;
+        status?: string;
+        payout?: number | string;
+        buy_price?: number | string;
+        profit?: number | string;
+      };
+    }) => {
+      const contract = data.proposal_open_contract;
+      if (!contract?.contract_id || (!contract.is_sold && contract.status !== 'sold')) return;
+
+      const contractId = String(contract.contract_id);
+      const payout = normalizeBalance(contract.payout) ?? 0;
+      const buyPrice = normalizeBalance(contract.buy_price) ?? 0;
+      const profit = normalizeBalance(contract.profit) ?? payout - buyPrice;
+      const result: 'won' | 'lost' = profit >= 0 ? 'won' : 'lost';
+
+      setPositions((current) => {
+        const updatedPositions = current.map((position) => position.id === contractId
+          ? { ...position, status: 'Settled' as const, payout, profit, result }
+          : position);
+        sessionStorage.setItem('smart-trades-positions', JSON.stringify(updatedPositions));
+        return updatedPositions;
+      });
+
+      derivService.refreshBalance().catch(() => {});
+    });
+
+    return unsubscribeContract;
+  }, [account?.loginid]);
 
   const isDigitMode = ['MATCHES_DIFFERS', 'EVEN_ODD', 'OVER_UNDER'].includes(tradeMode);
   const tradeButtons = {
