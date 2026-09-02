@@ -137,6 +137,7 @@ async function derivOAuthUrl() {
     response_type: 'code',
     client_id: DERIV_CLIENT_ID,
     scope: 'trade account_manage payment',
+    prompt: 'login',
     redirect_uri: redirectUri,
     state,
     code_challenge: challenge,
@@ -375,6 +376,9 @@ export default function App() {
     derivService.connectPublic();
     setAccount(null);
     setAvailableAccounts([]);
+    setAccountBalances({ real: null, demo: null, currency: 'USD' });
+    setAuthStatus('idle');
+    setAuthError('');
     setIsAccountMenuOpen(false);
     setIsCashierOpen(false);
   }
