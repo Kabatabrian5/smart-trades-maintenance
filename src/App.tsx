@@ -441,6 +441,7 @@ export default function App() {
   const [selectedDigit, setSelectedDigit] = useState<number>(3);
   const [tradeMode, setTradeMode] = useState<TradeMode>('MATCHES_DIFFERS');
   const [stake, setStake] = useState(10);
+  const [proposalPayouts, setProposalPayouts] = useState<Record<string, number | null>>({});
   const [ticksCount, setTicksCount] = useState(1);
   const [positions, setPositions] = useState<Position[]>(() => {
     const savedPositions = sessionStorage.getItem('smart-trades-positions');
@@ -813,6 +814,39 @@ export default function App() {
     HIGHER_LOWER: [{ label: 'Higher', type: 'CALL' }, { label: 'Lower', type: 'PUT' }],
     TOUCH_NO_TOUCH: [{ label: 'Touch', type: 'ONETOUCH' }, { label: 'No Touch', type: 'NOTOUCH' }],
   }[tradeMode];
+
+  useEffect(() => {
+    if (!account || stake < 0.35) {
+      setProposalPayouts({});
+      return;
+    }
+
+    let isMounted = true;
+    const quoteStake = Math.max(0.35, stake);
+    const needsBarrier = ['DIGITMATCH', 'DIGITDIFF', 'DIGITOVER', 'DIGITUNDER', 'ONETOUCH', 'NOTOUCH'];
+
+    Promise.all(tradeButtons.map(async (button) => {
+      const response = await derivService.send({
+        proposal: 1,
+        amount: quoteStake,
+        basis: 'stake',
+        currency: 'USD',
+        underlying_symbol: selectedSymbol,
+        contract_type: button.type,
+        duration: ticksCount,
+        duration_unit: 't',
+        ...(needsBarrier.includes(button.type) ? { barrier: selectedDigit.toString() } : {}),
+      }).catch(() => null);
+      return [button.type, normalizeBalance(response?.proposal?.payout)] as const;
+    })).then((quotes) => {
+      if (isMounted) setProposalPayouts(Object.fromEntries(quotes));
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [account?.loginid, selectedSymbol, tradeMode, selectedDigit, ticksCount, stake]);
+
   const activeAccountType = account ? getAccountType(account) : null;
   const activeBalance = account ? account.balance ?? accountBalances[activeAccountType || 'real'] : null;
   const settledPositions = positions.filter((position) => position.status === 'Settled');
@@ -967,7 +1001,7 @@ export default function App() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-3 sm:pt-4 border-t border-[#22222c]">
-              {tradeButtons.map((button, index) => <button key={button.type} onClick={() => handlePurchase(button.type)} className={`py-3 px-2 rounded-xl text-center font-bold cursor-pointer ${index === 0 ? 'bg-teal-500 text-black' : 'bg-rose-600 text-white'}`}>{button.label}</button>)}
+              {tradeButtons.map((button, index) => <button key={button.type} onClick={() => handlePurchase(button.type)} className={`py-2 px-2 rounded-xl text-center font-bold cursor-pointer ${index === 0 ? 'bg-teal-500 text-black' : 'bg-rose-600 text-white'}`}><span className="block">{button.label}</span><span className="mt-1 block text-[10px] font-semibold opacity-80">Payout: {proposalPayouts[button.type] === null || proposalPayouts[button.type] === undefined ? '--' : `${proposalPayouts[button.type]?.toFixed(2)} USD`}</span></button>)}
             </div>
             <div className="mt-3 space-y-1.5 rounded-xl border border-[#22222c] bg-[#181820] p-3 text-[11px] sm:hidden">
               <div className="flex items-center justify-between"><span className="text-gray-500">Market</span><span className="font-semibold text-gray-200">{liveMarkets.find((market) => market.id === selectedSymbol)?.name ?? selectedSymbol}</span></div>
