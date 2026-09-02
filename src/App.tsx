@@ -797,6 +797,12 @@ export default function App() {
   }[tradeMode];
   const activeAccountType = account ? getAccountType(account) : null;
   const activeBalance = account ? account.balance ?? accountBalances[activeAccountType || 'real'] : null;
+  const settledPositions = positions.filter((position) => position.status === 'Settled');
+  const totalStake = positions.reduce((total, position) => total + position.stake, 0);
+  const totalPayout = settledPositions.reduce((total, position) => total + (position.payout ?? 0), 0);
+  const totalProfitLoss = settledPositions.reduce((total, position) => total + (position.profit ?? 0), 0);
+  const contractsLost = settledPositions.filter((position) => position.result === 'lost').length;
+  const contractsWon = settledPositions.filter((position) => position.result === 'won').length;
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#16161c] text-white font-sans relative">
@@ -830,7 +836,7 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex h-16 min-h-16 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <nav className="md:hidden flex shrink-0 items-stretch gap-1 overflow-x-auto border-b border-[#2a2a36] bg-[#121217] px-2 py-2">
         {navigationItems.map((item) => (
           <button
             key={item.id}
@@ -846,8 +852,8 @@ export default function App() {
 
       {/* Manual Trading View */}
       {currentTab === 'manual-trading' && (
-        <div className="flex flex-1 flex-col overflow-y-auto pb-16 md:flex-row md:overflow-hidden md:pb-0">
-          <main className="flex-1 min-w-0 flex flex-col bg-[#16161c] md:overflow-y-auto p-2 pb-28 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
+        <div className="flex flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+          <main className="flex-none min-w-0 flex flex-col bg-[#16161c] md:flex-1 md:overflow-y-auto p-2 sm:p-6 space-y-2 sm:space-y-4">
             <div className="flex items-center justify-between bg-[#1b1b24] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-[#262633] shadow-md shrink-0">
               <div className="flex items-center space-x-3">
                 <span className={`w-3 h-3 rounded-full ${marketStatus.includes('Live') ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
@@ -874,7 +880,7 @@ export default function App() {
               <div className="text-xs text-gray-400">Status: <span className="text-white font-semibold">{marketStatus}</span></div>
             </div>
 
-            <div className="flex-none min-h-[220px] items-center justify-start bg-[#1b1b24]/40 border border-[#262633] rounded-2xl p-2 pt-4 sm:p-8 md:flex md:flex-1 md:min-h-0 md:justify-center md:pt-8 relative shadow-inner">
+            <div className="flex-none min-h-[150px] items-center justify-start bg-[#1b1b24]/40 border border-[#262633] rounded-2xl p-2 pt-4 sm:p-8 md:flex md:flex-1 md:min-h-0 md:justify-center md:pt-8 relative shadow-inner">
               <div className="grid grid-cols-5 gap-1.5 sm:gap-6 max-w-2xl w-full justify-items-center">
                 {digitStats.map((item) => {
                   const isSelected = selectedDigit === item.digit;
@@ -916,7 +922,7 @@ export default function App() {
             </div>
           </main>
 
-          <aside className="w-full sm:w-80 bg-[#121217] border-t sm:border-t-0 sm:border-l border-[#22222c] flex flex-col h-auto sm:h-full text-white p-3 pb-28 sm:p-5 sm:pb-5 justify-between shrink-0 gap-3 sm:gap-0">
+          <aside className="w-full sm:w-80 bg-[#121217] border-t sm:border-t-0 sm:border-l border-[#22222c] flex flex-col h-auto sm:h-full text-white p-3 sm:p-5 justify-between shrink-0 gap-3 sm:gap-0">
             <div className="space-y-2 sm:space-y-4">
               <div className="flex items-center justify-between text-xs font-bold uppercase text-gray-400 border-b border-[#22222c] pb-2">
                 <select value={tradeMode} onChange={(event) => setTradeMode(event.target.value as TradeMode)} className="max-w-[70%] bg-transparent text-xs font-bold uppercase text-gray-300 outline-none">
@@ -964,7 +970,7 @@ export default function App() {
             <div className="grid grid-cols-3 border-b border-[#252630]">{(['summary', 'transactions', 'journal'] as const).map((tab) => <button key={tab} onClick={() => setPositionsPanelTab(tab)} className={`border-b-2 px-2 py-3 text-xs font-semibold capitalize transition-colors ${positionsPanelTab === tab ? 'border-rose-500 text-white' : 'border-transparent text-gray-500 hover:text-gray-200'}`}>{tab}</button>)}</div>
             {positionsPanelTab === 'summary' && <>
               {positions.length === 0 ? <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center px-6 text-center"><div className="grid h-12 w-12 place-items-center rounded-xl border border-[#30313c] bg-[#1b1c25] text-lg">▥</div><p className="mt-4 text-sm font-bold text-gray-200">No positions yet</p><p className="mt-1 text-[10px] text-gray-500">Completed or open trades will appear here.</p></div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => { const profit = position.profit ?? 0; const isSettled = position.status === 'Settled'; return <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-bold">{position.symbol}</p><p className="text-xs text-gray-400">{position.contract} · Contract #{position.id}</p></div><p className={`text-xs font-bold ${isSettled ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}`}>{position.status}</p></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><div><p className="text-[9px] uppercase text-gray-500">Ticks</p><p className="font-bold">{position.ticksElapsed ?? 0}/{position.duration}</p></div><div><p className="text-[9px] uppercase text-gray-500">P/L</p><p className={`font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{profit.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Contract value</p><p className="font-bold">{(position.contractValue ?? position.stake).toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Potential payout</p><p className="font-bold">{(position.payout ?? 0).toFixed(2)} USD</p></div></div></div>; })}</div>}
-              <div className="border-t border-[#252630] px-4 py-5 sm:px-6"><div className="grid grid-cols-3 gap-y-5 text-center"><div><p className="text-[9px] uppercase text-gray-500">Total stake</p><p className="text-xs font-bold">{positions.reduce((total, position) => total + position.stake, 0).toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Total payout</p><p className="text-xs font-bold">0.00 USD</p></div><div><p className="text-[9px] uppercase text-gray-500">No. of runs</p><p className="text-xs font-bold">{positions.length}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts lost</p><p className="text-xs font-bold">0</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts won</p><p className="text-xs font-bold">0</p></div><div><p className="text-[9px] uppercase text-gray-500">Total profit/loss</p><p className="text-xs font-bold text-emerald-400">0.00 USD</p></div></div><button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="mt-5 w-full rounded-xl border border-[#363744] bg-[#1d1e27] py-2.5 text-xs font-bold text-gray-200 transition hover:border-rose-400 hover:text-white">Reset</button></div>
+              <div className="border-t border-[#252630] px-4 py-5 sm:px-6"><div className="grid grid-cols-3 gap-y-5 text-center"><div><p className="text-[9px] uppercase text-gray-500">Total stake</p><p className="text-xs font-bold">{totalStake.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Total payout</p><p className="text-xs font-bold">{totalPayout.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">No. of runs</p><p className="text-xs font-bold">{positions.length}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts lost</p><p className="text-xs font-bold">{contractsLost}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts won</p><p className="text-xs font-bold">{contractsWon}</p></div><div><p className="text-[9px] uppercase text-gray-500">Total profit/loss</p><p className={`text-xs font-bold ${totalProfitLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{totalProfitLoss.toFixed(2)} USD</p></div></div><button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="mt-5 w-full rounded-xl border border-[#363744] bg-[#1d1e27] py-2.5 text-xs font-bold text-gray-200 transition hover:border-rose-400 hover:text-white">Reset</button></div>
             </>}
             {positionsPanelTab === 'transactions' && <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No active contract transactions yet.</div>}
             {positionsPanelTab === 'journal' && <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">System logs and triggers will appear here.</div>}
