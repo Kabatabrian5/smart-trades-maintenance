@@ -223,6 +223,28 @@ export default function App() {
     };
   }, []);
 
+  // Restore the authenticated socket after a page refresh. The account is persisted
+  // locally, but the OTP-bearing WebSocket URL must be minted again for each session.
+  useEffect(() => {
+    if (!account) return;
+
+    let isMounted = true;
+    requestAccountWebSocketUrl(account.token, DERIV_CLIENT_ID, account.loginid)
+      .then((wsUrl) => {
+        if (isMounted) derivService.connectToUrl(wsUrl);
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) return;
+        sessionStorage.removeItem('smart-trades-account');
+        setAccount(null);
+        setAuthError(error instanceof Error ? error.message : 'Saved Deriv session expired');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Deriv's current Options API: an OIDC access token doesn't authenticate a WebSocket
   // connection directly. Instead we list the user's accounts, mint a one-time-password
   // WebSocket URL for the chosen account, and connect straight to that (no `authorize`
