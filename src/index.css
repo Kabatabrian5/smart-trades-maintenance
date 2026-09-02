@@ -9,4 +9,35 @@
     padding: 0;
     overflow: hidden;
   }
+
+  .theme-light {
+    background: #f4f7f8 !important;
+    color: #18232b !important;
+  }
+
+  .theme-light header,
+  .theme-light nav,
+  .theme-light main,
+  .theme-light aside,
+  .theme-light section,
+  .theme-light [class*="bg-[#121217"],
+  .theme-light [class*="bg-[#16161c"],
+  .theme-light [class*="bg-[#17171f"],
+  .theme-light [class*="bg-[#1b1b24"],
+  .theme-light [class*="bg-[#181820"],
+  .theme-light [class*="bg-[#111217"] {
+    background-color: #ffffff !important;
+    color: #18232b !important;
+  }
+
+  .theme-light [class*="text-white"],
+  .theme-light [class*="text-gray-200"],
+  .theme-light [class*="text-gray-300"],
+  .theme-light [class*="text-gray-400"] {
+    color: #34444d !important;
+  }
+
+  .theme-light [class*="border-[#"] {
+    border-color: #d7e0e4 !important;
+  }
 }
