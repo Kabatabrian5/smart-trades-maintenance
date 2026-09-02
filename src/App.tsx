@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import PositionsDrawer from './components/layout/PositionsDrawer';
 import { useDerivSocket } from './hooks/useDerivSocket';
 import { derivService } from './services/derivSocket';
@@ -72,6 +72,8 @@ interface Position {
   stake: number;
   duration: number;
   ticksElapsed?: number;
+  lastDigit?: number;
+  createdAt?: number;
   contractValue?: number;
   payout?: number;
   profit?: number;
@@ -160,7 +162,26 @@ function playSignalBeep() {
   oscillator.stop(context.currentTime + 0.14);
 }
 
+function playTradeSound(result: 'won' | 'lost') {
+  const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return;
+  const context = new AudioContextClass();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = 'sine';
+  const start = context.currentTime;
+  oscillator.frequency.setValueAtTime(result === 'won' ? 520 : 180, start);
+  oscillator.frequency.linearRampToValueAtTime(result === 'won' ? 880 : 110, start + 0.22);
+  gain.gain.setValueAtTime(0.045, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + 0.24);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(start);
+  oscillator.stop(start + 0.24);
+}
+
 export default function App() {
+  const [isBooting, setIsBooting] = useState(true);
   const [isLightTheme, setIsLightTheme] = useState(false);
   const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots'>('manual-trading');
   const [isCashierOpen, setIsCashierOpen] = useState(false);
@@ -182,6 +203,12 @@ export default function App() {
   const [accountBalances, setAccountBalances] = useState<AccountBalances>({ real: null, demo: null, currency: 'USD' });
   const [authStatus, setAuthStatus] = useState<'idle' | 'authorizing' | 'failed'>('idle');
   const [authError, setAuthError] = useState('');
+  const announcedSettlements = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setIsBooting(false), 1100);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -544,6 +571,7 @@ export default function App() {
   const [builderCategory, setBuilderCategory] = useState<string>('Trade parameters');
   const [rightPanelTab, setRightPanelTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
   const [positionsPanelTab, setPositionsPanelTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
+  const [journalPeriod, setJournalPeriod] = useState<'today' | 'yesterday' | 'all'>('today');
   const [isBotRunning, setIsBotRunning] = useState(false);
   const [botRuns, setBotRuns] = useState(0);
   const [botProfit, setBotProfit] = useState(0);
@@ -740,6 +768,7 @@ export default function App() {
           contract: contractType,
           stake: tradeStake,
           duration: ticksCount,
+          createdAt: Date.now(),
           status: 'Open',
         };
         setPositions((current) => {
@@ -766,6 +795,7 @@ export default function App() {
         is_sold?: number;
         status?: string;
         tick_count?: number | string;
+        current_spot?: number | string;
         bid_price?: number | string;
         payout?: number | string;
         buy_price?: number | string;
@@ -777,6 +807,8 @@ export default function App() {
 
       const contractId = String(contract.contract_id);
       const ticksElapsed = normalizeBalance(contract.tick_count);
+      const currentSpot = normalizeBalance(contract.current_spot);
+      const lastDigit = currentSpot === null ? undefined : Number(currentSpot.toFixed(2).slice(-1));
       const contractValue = normalizeBalance(contract.bid_price);
       const payout = normalizeBalance(contract.payout) ?? 0;
       const buyPrice = normalizeBalance(contract.buy_price) ?? 0;
@@ -789,6 +821,7 @@ export default function App() {
           ? {
               ...position,
               ...(ticksElapsed === null ? {} : { ticksElapsed }),
+              ...(lastDigit === undefined ? {} : { lastDigit }),
               ...(contractValue === null ? {} : { contractValue }),
               payout,
               profit,
@@ -799,7 +832,13 @@ export default function App() {
         return updatedPositions;
       });
 
-      if (settled) derivService.refreshBalance().catch(() => {});
+      if (settled) {
+        if (!announcedSettlements.current.has(contractId)) {
+          announcedSettlements.current.add(contractId);
+          playTradeSound(result);
+        }
+        derivService.refreshBalance().catch(() => {});
+      }
     });
 
     return unsubscribeContract;
@@ -855,9 +894,21 @@ export default function App() {
   const totalProfitLoss = settledPositions.reduce((total, position) => total + (position.profit ?? 0), 0);
   const contractsLost = settledPositions.filter((position) => position.result === 'lost').length;
   const contractsWon = settledPositions.filter((position) => position.result === 'won').length;
+  const journalDay = new Date();
+  if (journalPeriod === 'yesterday') journalDay.setDate(journalDay.getDate() - 1);
+  const journalPositions = journalPeriod === 'all' ? settledPositions : settledPositions.filter((position) => {
+    if (!position.createdAt) return journalPeriod === 'today';
+    const date = new Date(position.createdAt);
+    return date.toDateString() === journalDay.toDateString();
+  });
+  const journalProfit = journalPositions.reduce((total, position) => total + (position.profit ?? 0), 0);
+  const journalStake = journalPositions.reduce((total, position) => total + position.stake, 0);
+  const journalWon = journalPositions.filter((position) => position.result === 'won').length;
+  const journalLost = journalPositions.filter((position) => position.result === 'lost').length;
 
   return (
     <div className={`${isLightTheme ? 'theme-light' : ''} flex flex-col h-screen w-screen overflow-hidden bg-[#16161c] text-white font-sans relative`}>
+      {isBooting && <div className="platform-boot" role="status" aria-live="polite"><div className="platform-boot__mark">ST</div><p className="platform-boot__name">Smartest Trades</p><p className="platform-boot__status">Initializing trading workspace</p><div className="platform-boot__line"><span /></div></div>}
       <header className="h-auto min-h-14 bg-[#121217] border-b border-[#22222c] flex items-center justify-between px-3 py-2 sm:px-6 sm:py-0 shrink-0 z-20 gap-2">
         <div className="flex items-center space-x-6 min-w-0">
           <div className="flex items-center space-x-2">
@@ -1025,7 +1076,7 @@ export default function App() {
               <div className="border-t border-[#252630] px-4 py-5 sm:px-6"><div className="grid grid-cols-3 gap-y-5 text-center"><div><p className="text-[9px] uppercase text-gray-500">Total stake</p><p className="text-xs font-bold">{totalStake.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Total payout</p><p className="text-xs font-bold">{totalPayout.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">No. of runs</p><p className="text-xs font-bold">{positions.length}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts lost</p><p className="text-xs font-bold">{contractsLost}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts won</p><p className="text-xs font-bold">{contractsWon}</p></div><div><p className="text-[9px] uppercase text-gray-500">Total profit/loss</p><p className={`text-xs font-bold ${totalProfitLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{totalProfitLoss.toFixed(2)} USD</p></div></div><button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="mt-5 w-full rounded-xl border border-[#363744] bg-[#1d1e27] py-2.5 text-xs font-bold text-gray-200 transition hover:border-rose-400 hover:text-white">Reset</button></div>
             </>}
             {positionsPanelTab === 'transactions' && (positions.length === 0 ? <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No transactions yet.</div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4 text-xs"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-white">#{position.id}</p><p className="mt-1 text-gray-400">{position.symbol} · {position.contract}</p></div><span className={position.status === 'Settled' ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}>{position.status}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-gray-400 sm:grid-cols-4"><span>Stake <b className="block text-white">{position.stake.toFixed(2)} USD</b></span><span>Value <b className="block text-white">{(position.contractValue ?? position.stake).toFixed(2)} USD</b></span><span>Payout <b className="block text-white">{(position.payout ?? 0).toFixed(2)} USD</b></span><span>P/L <b className={`block ${position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{(position.profit ?? 0).toFixed(2)} USD</b></span></div></div>)}</div>)}
-            {positionsPanelTab === 'journal' && (positions.length === 0 ? <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No journal events yet.</div> : <div className="space-y-2 p-4 sm:p-6">{positions.flatMap((position) => [{ id: `${position.id}-opened`, label: 'Position opened', detail: `${position.symbol} · Contract #${position.id}`, tone: 'text-teal-300' }, ...(position.status === 'Settled' ? [{ id: `${position.id}-settled`, label: `Position settled · ${position.result === 'won' ? 'Won' : 'Lost'}`, detail: `Profit/loss ${(position.profit ?? 0).toFixed(2)} USD`, tone: position.result === 'won' ? 'text-emerald-400' : 'text-rose-400' }] : [])]).map((event) => <div key={event.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4 text-xs"><p className={`font-bold ${event.tone}`}>{event.label}</p><p className="mt-1 text-gray-400">{event.detail}</p></div>)}</div>)}
+            {positionsPanelTab === 'journal' && <div className="p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-gray-500">Performance report</p><p className={`mt-1 text-2xl font-extrabold ${journalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{journalProfit >= 0 ? '+' : ''}{journalProfit.toFixed(2)} USD</p><p className="text-xs text-gray-500">{journalWon} won · {journalLost} lost · {journalStake.toFixed(2)} USD staked</p></div><select value={journalPeriod} onChange={(event) => setJournalPeriod(event.target.value as typeof journalPeriod)} className="rounded-lg border border-[#30313d] bg-[#17171f] px-3 py-2 text-xs font-bold text-white"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="all">All time</option></select></div><div className="mt-5 flex h-32 items-end gap-2 rounded-xl border border-[#262633] bg-[#1b1b24] p-4">{(journalPositions.length ? journalPositions : [{ id: 'empty', profit: 0, stake: 0 }]).map((position, index) => { const height = position.profit === undefined ? 0 : Math.min(100, Math.max(8, Math.abs(position.profit) / Math.max(1, journalStake) * 100)); return <div key={`${position.id}-${index}`} className="flex h-full flex-1 items-end"><div title={`${(position.profit ?? 0).toFixed(2)} USD`} className={`w-full rounded-t-md ${position.profit && position.profit < 0 ? 'bg-rose-400' : 'bg-emerald-400'}`} style={{ height: `${height}%` }} /></div>; })}</div><div className="mt-4 space-y-2">{journalPositions.length === 0 ? <p className="py-5 text-center text-xs text-gray-500">No settled trades for this period.</p> : journalPositions.map((position) => <div key={position.id} className="flex items-center justify-between rounded-xl border border-[#262633] bg-[#1b1b24] p-3 text-xs"><span className="text-gray-400">{position.symbol} · #{position.id}</span><span className={position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}>{(position.profit ?? 0).toFixed(2)} USD</span></div>)}</div></div>}
           </div>
           </section>
         </main>
