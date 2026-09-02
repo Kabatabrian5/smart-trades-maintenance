@@ -229,9 +229,14 @@ export default function App() {
     if (!account) return;
 
     let isMounted = true;
-    requestAccountWebSocketUrl(account.token, DERIV_CLIENT_ID, account.loginid)
+    fetchOptionsAccounts(account.token, DERIV_CLIENT_ID)
+      .then((accounts) => {
+        if (!isMounted) return;
+        setAvailableAccounts(accounts);
+        return requestAccountWebSocketUrl(account.token, DERIV_CLIENT_ID, account.loginid);
+      })
       .then((wsUrl) => {
-        if (isMounted) derivService.connectToUrl(wsUrl);
+        if (isMounted && wsUrl) derivService.connectToUrl(wsUrl);
       })
       .catch((error: unknown) => {
         if (!isMounted) return;
@@ -387,7 +392,8 @@ export default function App() {
     const unsubscribeBalance = derivService.subscribe('balance', (data: { balance?: { balance?: number; loginid?: string; currency?: string } }) => {
       const balance = normalizeBalance(data.balance?.balance);
       if (balance === null) return;
-      const isDemo = account.accountType === 'demo' || data.balance?.loginid?.startsWith('VR') || account.loginid.startsWith('VR');
+      if (data.balance?.loginid && data.balance.loginid !== account.loginid) return;
+      const isDemo = account.accountType === 'demo' || account.loginid.startsWith('VR');
       setAccountBalances((previous) => ({ ...previous, [isDemo ? 'demo' : 'real']: balance, currency: data.balance?.currency || previous.currency }));
       setAccount((previous) => {
         if (!previous) return previous;
@@ -972,8 +978,8 @@ export default function App() {
               {positions.length === 0 ? <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center px-6 text-center"><div className="grid h-12 w-12 place-items-center rounded-xl border border-[#30313c] bg-[#1b1c25] text-lg">▥</div><p className="mt-4 text-sm font-bold text-gray-200">No positions yet</p><p className="mt-1 text-[10px] text-gray-500">Completed or open trades will appear here.</p></div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => { const profit = position.profit ?? 0; const isSettled = position.status === 'Settled'; return <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-bold">{position.symbol}</p><p className="text-xs text-gray-400">{position.contract} · Contract #{position.id}</p></div><p className={`text-xs font-bold ${isSettled ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}`}>{position.status}</p></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><div><p className="text-[9px] uppercase text-gray-500">Ticks</p><p className="font-bold">{position.ticksElapsed ?? 0}/{position.duration}</p></div><div><p className="text-[9px] uppercase text-gray-500">P/L</p><p className={`font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{profit.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Contract value</p><p className="font-bold">{(position.contractValue ?? position.stake).toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Potential payout</p><p className="font-bold">{(position.payout ?? 0).toFixed(2)} USD</p></div></div></div>; })}</div>}
               <div className="border-t border-[#252630] px-4 py-5 sm:px-6"><div className="grid grid-cols-3 gap-y-5 text-center"><div><p className="text-[9px] uppercase text-gray-500">Total stake</p><p className="text-xs font-bold">{totalStake.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Total payout</p><p className="text-xs font-bold">{totalPayout.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">No. of runs</p><p className="text-xs font-bold">{positions.length}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts lost</p><p className="text-xs font-bold">{contractsLost}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts won</p><p className="text-xs font-bold">{contractsWon}</p></div><div><p className="text-[9px] uppercase text-gray-500">Total profit/loss</p><p className={`text-xs font-bold ${totalProfitLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{totalProfitLoss.toFixed(2)} USD</p></div></div><button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="mt-5 w-full rounded-xl border border-[#363744] bg-[#1d1e27] py-2.5 text-xs font-bold text-gray-200 transition hover:border-rose-400 hover:text-white">Reset</button></div>
             </>}
-            {positionsPanelTab === 'transactions' && <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No active contract transactions yet.</div>}
-            {positionsPanelTab === 'journal' && <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">System logs and triggers will appear here.</div>}
+            {positionsPanelTab === 'transactions' && (positions.length === 0 ? <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No transactions yet.</div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4 text-xs"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-white">#{position.id}</p><p className="mt-1 text-gray-400">{position.symbol} · {position.contract}</p></div><span className={position.status === 'Settled' ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}>{position.status}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-gray-400 sm:grid-cols-4"><span>Stake <b className="block text-white">{position.stake.toFixed(2)} USD</b></span><span>Value <b className="block text-white">{(position.contractValue ?? position.stake).toFixed(2)} USD</b></span><span>Payout <b className="block text-white">{(position.payout ?? 0).toFixed(2)} USD</b></span><span>P/L <b className={`block ${position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{(position.profit ?? 0).toFixed(2)} USD</b></span></div></div>)}</div>)}
+            {positionsPanelTab === 'journal' && (positions.length === 0 ? <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No journal events yet.</div> : <div className="space-y-2 p-4 sm:p-6">{positions.flatMap((position) => [{ id: `${position.id}-opened`, label: 'Position opened', detail: `${position.symbol} · Contract #${position.id}`, tone: 'text-teal-300' }, ...(position.status === 'Settled' ? [{ id: `${position.id}-settled`, label: `Position settled · ${position.result === 'won' ? 'Won' : 'Lost'}`, detail: `Profit/loss ${(position.profit ?? 0).toFixed(2)} USD`, tone: position.result === 'won' ? 'text-emerald-400' : 'text-rose-400' }] : [])]).map((event) => <div key={event.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4 text-xs"><p className={`font-bold ${event.tone}`}>{event.label}</p><p className="mt-1 text-gray-400">{event.detail}</p></div>)}</div>)}
           </div>
           </section>
         </main>
