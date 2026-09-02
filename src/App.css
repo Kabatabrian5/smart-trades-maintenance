@@ -354,15 +354,27 @@
 
 @keyframes auth-content-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 
-.platform-boot { position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; justify-items: center; gap: 10px; background: radial-gradient(circle at center, #102b32 0, #05080d 52%, #020305 100%); color: #fff; animation: platform-boot-out 500ms ease 850ms forwards; pointer-events: none; }
-.platform-boot__mark { display: grid; width: 74px; height: 74px; place-items: center; border: 1px solid #4fe1ca; border-radius: 20px; color: #041317; background: linear-gradient(135deg, #8af7dd, #19a99a); font-size: 22px; font-weight: 900; box-shadow: 0 0 38px rgba(25, 203, 182, 0.38); animation: platform-boot-pulse 1.4s ease-in-out infinite; }
-.platform-boot__name { margin: 6px 0 0; color: #fff; font-size: 23px; font-weight: 900; letter-spacing: 0; }
-.platform-boot__status { margin: 0; color: #8fa7af; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; }
+.platform-boot { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; overflow: hidden; padding: 12px 18px 28px; background: #07121c; color: #fff; animation: platform-boot-out 500ms ease 1450ms forwards; pointer-events: none; }
+.platform-boot__scan { position: absolute; inset: 0; opacity: 0.18; background: linear-gradient(rgba(44, 181, 165, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(44, 181, 165, 0.08) 1px, transparent 1px); background-size: 42px 42px; animation: platform-boot-grid 6s linear infinite; }
+.platform-boot__logo { position: relative; z-index: 1; display: flex; width: 74px; height: 48px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: #f3f7f4; color: #33464c; box-shadow: 0 0 20px rgba(255,255,255,0.08); }
+.platform-boot__logo img { width: 22px; height: 22px; }
+.platform-boot__logo span { font-size: 5px; font-weight: 800; text-transform: uppercase; }
+.platform-boot__network { position: absolute; inset: 105px 0 95px; }
+.platform-boot__network i, .platform-boot__network b { position: absolute; display: block; width: 8px; height: 8px; border-radius: 50%; background: #20e9ad; box-shadow: 0 0 13px 4px rgba(32, 233, 173, 0.5); animation: platform-boot-twinkle 1.8s ease-in-out infinite; }
+.platform-boot__network i:nth-child(1) { left: 16%; top: 25%; } .platform-boot__network i:nth-child(2) { left: 39%; top: 42%; animation-delay: 300ms; } .platform-boot__network i:nth-child(3) { right: 24%; top: 58%; animation-delay: 650ms; } .platform-boot__network i:nth-child(4) { left: 22%; bottom: 24%; animation-delay: 900ms; } .platform-boot__network i:nth-child(5) { right: 13%; bottom: 18%; animation-delay: 1.1s; }
+.platform-boot__network b { left: 50%; top: 61%; width: 24px; height: 24px; transform: translate(-50%, -50%); background: #12f5bd; box-shadow: 0 0 28px 9px rgba(18, 245, 189, 0.5); animation: platform-boot-core 1.5s ease-in-out infinite; }
+.platform-boot__name { position: relative; z-index: 1; margin: 48px 0 0; color: #fff; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: clamp(25px, 7vw, 36px); font-weight: 800; letter-spacing: 0.08em; }
+.platform-boot__status { position: relative; z-index: 1; margin: 2px 0 0; color: #89949e; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }
 .platform-boot__line { width: min(70vw, 260px); height: 3px; overflow: hidden; background: rgba(143, 167, 175, 0.2); }
 .platform-boot__line span { display: block; width: 35%; height: 100%; background: #4fe1ca; box-shadow: 0 0 12px #4fe1ca; animation: platform-boot-line 1.1s ease-in-out infinite; }
+.platform-boot__readout { position: relative; margin: 4px 0 0; color: #67888f; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; letter-spacing: 0.12em; }
+.platform-boot__readout i { display: inline-block; width: 5px; height: 5px; margin: 0 7px; border-radius: 50%; background: #ffb347; box-shadow: 0 0 8px #ffb347; }
 @keyframes platform-boot-out { to { opacity: 0; visibility: hidden; } }
 @keyframes platform-boot-pulse { 50% { transform: scale(1.06); filter: brightness(1.2); } }
 @keyframes platform-boot-line { from { transform: translateX(-120%); } to { transform: translateX(340%); } }
+@keyframes platform-boot-grid { to { background-position: 0 42px; } }
+@keyframes platform-boot-twinkle { 50% { transform: scale(0.7); opacity: 0.45; } }
+@keyframes platform-boot-core { 50% { transform: translate(-50%, -50%) scale(1.15); } }
 @keyframes auth-grid-drift { from { background-position: 0 0; } to { background-position: 0 42px; } }
 @keyframes auth-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 @keyframes auth-spin-reverse { to { transform: translate(-50%, -50%) rotate(-360deg); } }

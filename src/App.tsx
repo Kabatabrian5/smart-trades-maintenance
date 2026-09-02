@@ -207,7 +207,7 @@ export default function App() {
   const announcedSettlements = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setIsBooting(false), 1100);
+    const timer = window.setTimeout(() => setIsBooting(false), 1700);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -912,7 +912,7 @@ export default function App() {
 
   return (
     <div className={`${isLightTheme ? 'theme-light' : ''} flex flex-col h-screen w-screen overflow-hidden bg-[#16161c] text-white font-sans relative`}>
-      {isBooting && <div className="platform-boot" role="status" aria-live="polite"><div className="platform-boot__mark">ST</div><p className="platform-boot__name">Smartest Trades</p><p className="platform-boot__status">Initializing trading workspace</p><div className="platform-boot__line"><span /></div></div>}
+      {isBooting && <div className="platform-boot" role="status" aria-live="polite"><div className="platform-boot__scan" /><div className="platform-boot__logo"><img src="/favicon.svg" alt="" /><span>Smartest Trades</span></div><div className="platform-boot__network" aria-hidden="true"><i /><i /><i /><i /><i /><b /></div><p className="platform-boot__name">Smart trades</p><p className="platform-boot__status">AI powered bots</p><div className="platform-boot__line"><span /></div><p className="platform-boot__readout">Optimizing execution logic...</p></div>}
       <header className="h-auto min-h-14 bg-[#121217] border-b border-[#22222c] flex items-center justify-between px-3 py-2 sm:px-6 sm:py-0 shrink-0 z-20 gap-2">
         <div className="flex items-center space-x-6 min-w-0">
           <div className="flex items-center space-x-2">
