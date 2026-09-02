@@ -678,7 +678,7 @@ export default function App() {
         amount: stake,
         basis: 'stake',
         currency: 'USD',
-        symbol: selectedSymbol,
+        underlying_symbol: selectedSymbol,
         contract_type: contractType,
         duration: ticksCount,
         duration_unit: 't',
