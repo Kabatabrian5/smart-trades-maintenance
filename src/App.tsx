@@ -699,10 +699,11 @@ export default function App() {
 
   const handlePurchase = async (contractType: string) => {
     try {
+      const tradeStake = Math.max(0.35, stake);
       const needsBarrier = ['DIGITMATCH', 'DIGITDIFF', 'DIGITOVER', 'DIGITUNDER', 'ONETOUCH', 'NOTOUCH'].includes(contractType);
       const proposalRes = await derivService.send({
         proposal: 1,
-        amount: stake,
+        amount: tradeStake,
         basis: 'stake',
         currency: 'USD',
         underlying_symbol: selectedSymbol,
@@ -718,7 +719,7 @@ export default function App() {
           id: String(buyRes.buy.contract_id),
           symbol: selectedSymbol,
           contract: contractType,
-          stake,
+          stake: tradeStake,
           duration: ticksCount,
           status: 'Open',
         };
@@ -730,7 +731,6 @@ export default function App() {
         await derivService.subscribeToContract(String(buyRes.buy.contract_id));
         await derivService.refreshBalance();
         setCurrentTab('positions');
-        alert(`Digit Trade executed! Contract ID: ${buyRes.buy.contract_id}`);
       }
 
     } catch (error: any) {
@@ -944,7 +944,7 @@ export default function App() {
                   <span className="mt-0.5 sm:mt-1 flex items-center justify-between text-sm font-bold text-white"><button type="button" onClick={() => setTicksCount((value) => Math.max(1, value - 1))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">-</button><span>{ticksCount}</span><button type="button" onClick={() => setTicksCount((value) => value + 1)} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">+</button></span>
                 </label>
                 <label className="rounded-xl border border-[#262633] bg-[#1b1b24] px-2 py-1.5 sm:p-2 text-center text-[9px] sm:text-[10px] uppercase text-gray-500">Stake
-                  <input type="number" min="0.35" step="0.01" value={stake} onChange={(event) => setStake(Number(event.target.value))} className="mt-0.5 sm:mt-1 w-full bg-transparent text-center text-sm font-bold text-white outline-none" />
+                  <span className="mt-0.5 sm:mt-1 flex items-center justify-between text-sm font-bold text-white"><button type="button" onClick={() => setStake((value) => Math.max(0.35, Number((value - 0.01).toFixed(2))))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">-</button><input type="number" min="0.35" step="0.01" value={stake || ''} onChange={(event) => setStake(event.target.value === '' ? 0 : Number(event.target.value))} onBlur={() => setStake((value) => Math.max(0.35, value || 0.35))} className="min-w-0 w-full bg-transparent text-center text-sm font-bold text-white outline-none" /><button type="button" onClick={() => setStake((value) => Number((Math.max(0.35, value) + 0.01).toFixed(2)))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">+</button></span>
                 </label>
               </div>
             </div>

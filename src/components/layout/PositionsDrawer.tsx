@@ -16,6 +16,12 @@ interface Position {
 
 export default function PositionsDrawer({ positions }: { positions: Position[] }) {
   const [activeSubTab, setActiveSubTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
+  const settledPositions = positions.filter((position) => position.status === 'Settled');
+  const totalStake = positions.reduce((total, position) => total + position.stake, 0);
+  const totalPayout = settledPositions.reduce((total, position) => total + (position.payout ?? 0), 0);
+  const totalProfitLoss = settledPositions.reduce((total, position) => total + (position.profit ?? 0), 0);
+  const contractsLost = settledPositions.filter((position) => position.result === 'lost').length;
+  const contractsWon = settledPositions.filter((position) => position.result === 'won').length;
 
   return (
     <aside className="w-80 bg-[#121217] border-r border-[#22222c] flex flex-col h-full text-white font-sans select-none">
@@ -70,15 +76,15 @@ export default function PositionsDrawer({ positions }: { positions: Position[] }
         <div className="grid grid-cols-3 gap-2 text-center mb-3">
           <div>
             <span className="text-gray-500 block text-[10px] uppercase font-semibold">Total stake</span>
-            <span className="font-bold text-gray-200">0.00 USD</span>
+            <span className="font-bold text-gray-200">{totalStake.toFixed(2)} USD</span>
           </div>
           <div>
             <span className="text-gray-500 block text-[10px] uppercase font-semibold">Total payout</span>
-            <span className="font-bold text-gray-200">0.00 USD</span>
+            <span className="font-bold text-gray-200">{totalPayout.toFixed(2)} USD</span>
           </div>
           <div>
             <span className="text-gray-500 block text-[10px] uppercase font-semibold">No. of runs</span>
-            <span className="font-bold text-gray-200">0</span>
+            <span className="font-bold text-gray-200">{positions.length}</span>
           </div>
         </div>
 
@@ -86,15 +92,15 @@ export default function PositionsDrawer({ positions }: { positions: Position[] }
         <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-[#22222c] mb-4 text-[11px]">
           <div>
             <span className="text-gray-500 block text-[9px] uppercase">Contracts lost</span>
-            <span className="font-bold text-gray-300">0</span>
+            <span className="font-bold text-gray-300">{contractsLost}</span>
           </div>
           <div>
             <span className="text-gray-500 block text-[9px] uppercase">Contracts won</span>
-            <span className="font-bold text-gray-300">0</span>
+            <span className="font-bold text-gray-300">{contractsWon}</span>
           </div>
           <div>
             <span className="text-gray-500 block text-[9px] uppercase">Total profit/loss</span>
-            <span className="font-bold text-emerald-400">0.00 USD</span>
+            <span className={`font-bold ${totalProfitLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{totalProfitLoss.toFixed(2)} USD</span>
           </div>
         </div>
 
