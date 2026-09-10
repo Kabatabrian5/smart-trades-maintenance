@@ -584,21 +584,8 @@ export default function App() {
     '1-3-2-6',
   ];
 
-  // Bot Builder internal state & Blocks Modal
-  const [builderCategory, setBuilderCategory] = useState<string>('Trade parameters');
-  const [rightPanelTab, setRightPanelTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
   const [positionsPanelTab, setPositionsPanelTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
   const [journalPeriod, setJournalPeriod] = useState<'today' | 'yesterday' | 'all'>('today');
-  const [isBotRunning, setIsBotRunning] = useState(false);
-  const [botRuns, setBotRuns] = useState(0);
-  const [botProfit, setBotProfit] = useState(0);
-
-  // Modal / Flyout state for category block details (Image 2)
-  const [activeCategoryModal, setActiveCategoryModal] = useState<string | null>(null);
-
-  // Canvas Blocks added to workspace
-  const [canvasPurchaseBlocks, setCanvasPurchaseBlocks] = useState<string[]>(['Rise']);
-  const [canvasSellBlocks, setCanvasSellBlocks] = useState<string[]>(['is available']);
 
   const totalTicks = Math.max(1, digitHistory.length);
   const digitStats = Array.from({ length: 10 }, (_, digit) => {
@@ -612,50 +599,6 @@ export default function App() {
   const lastDigit = currentTick !== null && !isNaN(currentTick) 
     ? parseInt(currentTick.toString().slice(-1), 10) 
     : 3;
-
-  const calculateNextStake = (lastResult: 'win' | 'loss'): number => {
-    if (!activeStrategyConfig) return stake;
-
-    const { strategyName, initialStake, factor, maxLimit, currentStake } = activeStrategyConfig;
-    let nextStake = currentStake;
-    let newStepIndex = activeStrategyConfig.stepIndex;
-
-    switch (strategyName) {
-      case 'Martingale':
-        if (lastResult === 'loss') {
-          nextStake = currentStake * (factor || 2);
-        } else {
-          nextStake = initialStake;
-        }
-        break;
-      case 'Reverse Martingale':
-        if (lastResult === 'win') {
-          nextStake = currentStake * (factor || 2);
-        } else {
-          nextStake = initialStake;
-        }
-        break;
-      case "D'Alembert":
-        if (lastResult === 'loss') {
-          nextStake = currentStake + (factor || 1);
-        } else {
-          nextStake = Math.max(initialStake, currentStake - (factor || 1));
-        }
-        break;
-      default:
-        nextStake = initialStake;
-        break;
-    }
-
-    if (nextStake > maxLimit) {
-      nextStake = initialStake;
-      newStepIndex = 0;
-    }
-
-    setActiveStrategyConfig(prev => prev ? { ...prev, currentStake: nextStake, stepIndex: newStepIndex } : null);
-    setStake(nextStake);
-    return nextStake;
-  };
 
   const handleLoadStrategyToWorkspace = () => {
     if (!selectedStrategy) return;
@@ -1138,6 +1081,7 @@ export default function App() {
         </main>
       )}
 
+<<<<<<< HEAD
       {/* Bot Builder Workspace View */}
       {currentTab === 'bot-builder' && (
         <div className="flex flex-1 flex-col overflow-hidden bg-[#f7f8fa] pb-16 text-gray-800 md:flex-row md:pb-0">
@@ -1148,10 +1092,27 @@ export default function App() {
             <label className="mx-3 my-3 flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-xs text-gray-400"><span>⌕</span><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search" className="w-full bg-transparent text-gray-800 outline-none" /></label>
             <div className="flex max-h-56 flex-col overflow-y-auto text-xs font-semibold md:max-h-none">
               {['Trade parameters', 'Purchase conditions', 'Sell conditions (optional)', 'Restart trading conditions', 'Analysis', 'Utility'].map((cat) => <button key={cat} onClick={() => { setBuilderCategory(cat); if (cat === 'Purchase conditions' || cat === 'Sell conditions (optional)') setActiveCategoryModal(cat); }} className={`flex items-center justify-between border-b border-gray-100 px-4 py-3.5 text-left ${builderCategory === cat ? 'bg-[#eef4ff] text-[#2563eb]' : 'text-gray-700 hover:bg-gray-50'}`}><span>{cat}</span><span className="text-gray-400">⌄</span></button>)}
+=======
+      {currentTab === 'bots' && (
+        <main className="flex-1 overflow-y-auto bg-[#0d1117] p-6 text-white">
+          <div className="mx-auto max-w-6xl space-y-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-400">Your library</p>
+                <h1 className="mt-2 text-3xl font-extrabold">Bots</h1>
+              </div>
+              <button
+                onClick={() => setCurrentTab('bot-builder')}
+                className="rounded-xl bg-teal-500 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-slate-950 transition hover:bg-teal-400"
+              >
+                Open Builder
+              </button>
+>>>>>>> ff630fb (Add official Deriv bot builder and bots section)
             </div>
             <div className="mt-auto border-t border-gray-200 p-3"><button className="w-full rounded-sm border border-amber-400 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-700">Risk Disclaimer</button></div>
           </aside>
 
+<<<<<<< HEAD
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="flex h-11 shrink-0 items-center gap-1 border-b border-gray-300 bg-white px-3 text-gray-600 shadow-sm">
               {['↻', '□', '▣', '⚑', '⌁', '↶', '↷', '⊕', '⊖'].map((icon, index) => <button key={index} title={['Refresh', 'Open', 'Save', 'Align', 'Chart', 'Undo', 'Redo', 'Zoom in', 'Zoom out'][index]} className="rounded px-2 py-1.5 text-sm hover:bg-gray-100">{icon}</button>)}
@@ -1184,67 +1145,68 @@ export default function App() {
           <button onClick={() => setCurrentTab('bots')} className="absolute right-4 top-3 z-10 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg hover:bg-slate-700">Back to Bots</button>
           <iframe title="Deriv Bot Builder" src="/bot-builder/" className="h-full w-full border-0" />
         </div>
-      )}
+=======
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {dashboardBots.map((bot) => (
+                <article key={bot.id} className="rounded-2xl border border-slate-800 bg-[#111827] p-5 shadow-lg shadow-slate-950/20">
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="rounded-full border border-teal-500/30 bg-teal-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-teal-300">
+                      {bot.status}
+                    </span>
+                    <button
+                      onClick={() => setCurrentTab('bot-builder')}
+                      className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-300 transition hover:text-white"
+                    >
+                      Open
+                    </button>
+                  </div>
 
-      {/* Category Flyout / Modal for Purchase Conditions (Matches Image 2) */}
-      {(activeCategoryModal === 'Purchase conditions' || activeCategoryModal === 'Sell conditions (optional)') && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col text-gray-800 animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-base font-bold text-gray-950">{activeCategoryModal}</h2>
-              <div className="flex items-center space-x-3">
-                {/* Plus button to add purchase block to workspace */}
-                <button 
-                  onClick={() => {
-                    if (activeCategoryModal === 'Purchase conditions') {
-                      setCanvasPurchaseBlocks(prev => [...prev, 'Rise']);
-                    } else {
-                      setCanvasSellBlocks(prev => [...prev, 'is available']);
-                    }
-                    setActiveCategoryModal(null);
-                  }}
-                  title="Add block to workspace"
-                  className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-blue-600 hover:text-white text-gray-700 flex items-center justify-center font-bold transition-colors cursor-pointer shadow-sm"
-                >
-                  +
-                </button>
-                <button 
-                  onClick={() => setActiveCategoryModal(null)}
-                  className="text-gray-400 hover:text-gray-700 text-xl font-bold cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
+                  <h2 className="text-lg font-bold text-white">{bot.name}</h2>
+                  <p className="mt-2 text-xs text-slate-400">Last modified: {bot.lastModified}</p>
 
-            <div className="p-6 space-y-6 overflow-y-auto max-h-[75vh]">
-              <p className="text-xs text-gray-600 leading-relaxed">
-                {activeCategoryModal === 'Purchase conditions'
-                  ? 'This block is mandatory. Only one copy of this block is allowed. You can place the Purchase block here as well as conditional blocks to define your purchase conditions.'
-                  : 'This optional block lets you define conditions for selling an active contract. Add sell blocks here to control when the bot exits a trade.'}
-                {' '}<a href="#" className="text-rose-600 font-semibold hover:underline">Learn more</a>
-              </p>
-
-              <div className={`p-4 rounded-xl text-white space-y-2 shadow-inner ${activeCategoryModal === 'Purchase conditions' ? 'bg-[#1e3a5f]' : 'bg-[#14532d]'}`}>
-                <div className="text-xs font-semibold">{activeCategoryModal === 'Purchase conditions' ? '2. Purchase conditions' : '3. Sell conditions (optional)'}</div>
-                <div className="w-full bg-[#1b2a47] h-8 rounded border border-blue-400/30"></div>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t border-gray-200">
-                <h3 className="text-sm font-bold text-gray-900">{activeCategoryModal === 'Purchase conditions' ? 'Purchase' : 'Sell'}</h3>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  {activeCategoryModal === 'Purchase conditions'
-                    ? 'Use this block to purchase the specific contract you want. You may add multiple Purchase blocks together with conditional blocks to define your purchase conditions.'
-                    : 'Use this block to define when the bot should sell an active contract. You may add multiple Sell blocks together with conditional blocks.'}
-                </p>
-
-                <div className="inline-flex items-center bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 space-x-4">
-                  <span className="text-xs font-mono font-bold text-gray-700">{activeCategoryModal === 'Purchase conditions' ? 'Purchase' : 'Sell'}</span>
-                  <span className="text-gray-400 text-xs">▼</span>
-                </div>
-              </div>
+                  <div className="mt-5 flex items-center justify-between border-t border-slate-800 pt-4 text-xs text-slate-300">
+                    <span>Template</span>
+                    <span className="font-bold text-slate-100">Deriv</span>
+                  </div>
+                </article>
+              ))}
             </div>
           </div>
+        </main>
+>>>>>>> ff630fb (Add official Deriv bot builder and bots section)
+      )}
+
+      {/* Official Deriv Bot Builder View */}
+      {currentTab === 'bot-builder' && (
+        <div className="flex flex-1 flex-col overflow-hidden bg-[#0b1020]">
+          <div className="flex items-center justify-between border-b border-slate-800 bg-[#111827] px-4 py-3 text-white">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff444f] text-sm font-black text-white">D</span>
+              <div>
+                <p className="text-sm font-extrabold">Deriv Bot Builder</p>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">official embedded build</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {activeStrategyConfig && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300">
+                  {activeStrategyConfig.strategyName} · {activeStrategyConfig.initialStake} USD
+                </div>
+              )}
+              <button
+                onClick={() => setCurrentTab('dashboard')}
+                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-200 transition hover:border-slate-500 hover:text-white"
+              >
+                Back to dashboard
+              </button>
+            </div>
+          </div>
+          <iframe
+            title="Deriv Bot Builder"
+            src="/bot-builder/"
+            className="h-full w-full border-0 bg-white"
+            allow="clipboard-write"
+          />
         </div>
       )}
 
