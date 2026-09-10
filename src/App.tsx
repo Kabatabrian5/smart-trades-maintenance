@@ -342,17 +342,17 @@ export default function App() {
     setCashierStatus('Sending M-Pesa prompt...');
     try {
       const phoneNumber = cashierPhone.replace(/\D/g, '').replace(/^0/, '254');
-      const depositResponse = await fetch('/api/mpesa-stk-push', {
+      const depositResponse = await fetch('/api/pawapay-deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber, kesAmount: cashierAmount, accountId: account.loginid }),
       });
-      const payload = await depositResponse.json().catch(() => ({})) as { message?: string; error?: string; checkoutRequestId?: string };
+      const payload = await depositResponse.json().catch(() => ({})) as { message?: string; error?: string; depositId?: string };
       if (!depositResponse.ok) throw new Error(payload.error || 'Deposit request failed');
       setCashierStatus(payload.message || 'M-Pesa prompt sent. Complete it on your phone.');
-      if (payload.checkoutRequestId) {
+      if (payload.depositId) {
         addTransaction({
-          id: payload.checkoutRequestId,
+          id: payload.depositId,
           type: 'deposit',
           amount: Number(cashierAmount) || 0,
           currency: 'KES',
@@ -360,7 +360,7 @@ export default function App() {
           status: 'pending',
           createdAt: Date.now(),
         });
-        pollTransactionStatus(payload.checkoutRequestId);
+        pollTransactionStatus(payload.depositId);
       }
     } catch (error) {
       setCashierStatus(error instanceof Error ? error.message : 'Deposit request failed');
@@ -404,7 +404,7 @@ export default function App() {
     if (attempt >= maxAttempts) return;
     setTimeout(async () => {
       try {
-        const statusResponse = await fetch(`/api/mpesa-status?checkoutRequestId=${encodeURIComponent(transactionId)}`);
+        const statusResponse = await fetch(`/api/pawapay-status?depositId=${encodeURIComponent(transactionId)}`);
         const statusPayload = await statusResponse.json().catch(() => ({})) as { status?: string; error?: string };
         if (!statusResponse.ok) throw new Error(statusPayload.error || 'Status check failed');
         const normalizedStatus = (statusPayload.status || '').toLowerCase();
