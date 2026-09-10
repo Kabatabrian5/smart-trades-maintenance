@@ -1081,109 +1081,13 @@ export default function App() {
         </main>
       )}
 
-<<<<<<< HEAD
-      {/* Bot Builder Workspace View */}
-      {currentTab === 'bot-builder' && (
-        <div className="flex flex-1 flex-col overflow-hidden bg-[#f7f8fa] pb-16 text-gray-800 md:flex-row md:pb-0">
-          <aside className="flex w-full shrink-0 flex-col border-b border-gray-200 bg-white shadow-sm md:w-64 md:border-b-0 md:border-r">
-            <button onClick={() => setIsQuickStrategyOpen(true)} className="m-2.5 rounded-sm bg-[#3f82ed] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#3476df]">Quick strategy</button>
-            <div className="border-b border-gray-200 px-4 pb-3"><p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Loaded bot</p><p className="mt-1 truncate text-xs font-black text-slate-800">{selectedBotTemplate?.name || 'Blank workspace'}</p>{selectedBotTemplate && <button onClick={() => window.open(`/bots/${selectedBotTemplate.file}`, '_blank', 'noopener,noreferrer')} className="mt-2 text-[10px] font-bold text-blue-600 hover:underline">Open XML template</button>}</div>
-            <div className="flex items-center justify-between border-y border-gray-200 px-4 py-3"><span className="text-xs font-bold">Blocks menu</span><button onClick={() => setCurrentTab('dashboard')} className="text-[11px] text-blue-600 hover:underline">Exit</button></div>
-            <label className="mx-3 my-3 flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-xs text-gray-400"><span>⌕</span><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search" className="w-full bg-transparent text-gray-800 outline-none" /></label>
-            <div className="flex max-h-56 flex-col overflow-y-auto text-xs font-semibold md:max-h-none">
-              {['Trade parameters', 'Purchase conditions', 'Sell conditions (optional)', 'Restart trading conditions', 'Analysis', 'Utility'].map((cat) => <button key={cat} onClick={() => { setBuilderCategory(cat); if (cat === 'Purchase conditions' || cat === 'Sell conditions (optional)') setActiveCategoryModal(cat); }} className={`flex items-center justify-between border-b border-gray-100 px-4 py-3.5 text-left ${builderCategory === cat ? 'bg-[#eef4ff] text-[#2563eb]' : 'text-gray-700 hover:bg-gray-50'}`}><span>{cat}</span><span className="text-gray-400">⌄</span></button>)}
-=======
-      {currentTab === 'bots' && (
-        <main className="flex-1 overflow-y-auto bg-[#0d1117] p-6 text-white">
-          <div className="mx-auto max-w-6xl space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-400">Your library</p>
-                <h1 className="mt-2 text-3xl font-extrabold">Bots</h1>
-              </div>
-              <button
-                onClick={() => setCurrentTab('bot-builder')}
-                className="rounded-xl bg-teal-500 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-slate-950 transition hover:bg-teal-400"
-              >
-                Open Builder
-              </button>
->>>>>>> ff630fb (Add official Deriv bot builder and bots section)
-            </div>
-            <div className="mt-auto border-t border-gray-200 p-3"><button className="w-full rounded-sm border border-amber-400 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-700">Risk Disclaimer</button></div>
-          </aside>
-
-<<<<<<< HEAD
-          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="flex h-11 shrink-0 items-center gap-1 border-b border-gray-300 bg-white px-3 text-gray-600 shadow-sm">
-              {['↻', '□', '▣', '⚑', '⌁', '↶', '↷', '⊕', '⊖'].map((icon, index) => <button key={index} title={['Refresh', 'Open', 'Save', 'Align', 'Chart', 'Undo', 'Redo', 'Zoom in', 'Zoom out'][index]} className="rounded px-2 py-1.5 text-sm hover:bg-gray-100">{icon}</button>)}
-            </div>
-            <div className="relative flex-1 overflow-auto bg-[radial-gradient(#dce1e8_1px,transparent_1px)] [background-size:18px_18px] p-6">
-              <div className="flex min-w-[940px] flex-wrap items-start gap-5">
-                <div className="w-[390px] overflow-hidden rounded-sm bg-[#07577a] text-white shadow-md">
-                  <div className="border-b border-white/20 px-3 py-2 text-xs font-bold">▣ 1. Trade parameters</div>
-                  <div className="space-y-2 p-2 text-[11px]"><div className="rounded bg-white/10 p-2">Market: <span className="rounded bg-white px-2 py-1 text-gray-700">Derived</span> › <span className="rounded bg-white px-2 py-1 text-gray-700">Continuous Indices</span> › <span className="rounded bg-white px-2 py-1 text-gray-700">Volatility 10 Index</span></div><div className="rounded bg-white/10 p-2">Trade Type: <span className="rounded bg-white px-2 py-1 text-gray-700">Up/Down</span> › <span className="rounded bg-white px-2 py-1 text-gray-700">Rise/Fall</span></div><div className="rounded bg-white/10 p-2">Contract Type: <span className="rounded bg-white px-2 py-1 text-gray-700">Both</span></div><div className="rounded bg-white/10 p-2">Default Candle Interval: <span className="rounded bg-white px-2 py-1 text-gray-700">1 minute</span></div></div>
-                </div>
-                <div className="w-[360px] overflow-hidden rounded-sm bg-[#07577a] text-white shadow-md"><div className="border-b border-white/20 px-3 py-2 text-xs font-bold">▣ 4. Restart trading conditions</div><div className="m-2 rounded bg-white/10 p-3 text-[11px]"><span className="mr-2 text-cyan-200">if</span> Martingale Trade Again After Purchase <span className="ml-2 rounded bg-white px-2 py-1 text-gray-700">with: martingale:profit</span><div className="mt-3 rounded bg-white/10 px-2 py-1">Trade again <button className="float-right rounded-full bg-white/20 px-1.5">+</button></div></div></div>
-                <div className="w-[390px] overflow-hidden rounded-sm bg-[#07577a] text-white shadow-md"><div className="border-b border-white/20 px-3 py-2 text-xs font-bold">▣ 2. Purchase conditions</div><div className="m-2 rounded bg-white/10 p-3 text-[11px]"><span className="text-cyan-200">Purchase</span> <span className="rounded bg-white px-2 py-1 text-gray-700">{canvasPurchaseBlocks[0] || 'Rise'}</span><button onClick={() => setActiveCategoryModal('Purchase conditions')} className="float-right rounded-full bg-white/20 px-1.5">+</button></div></div>
-                <div className="w-[360px] overflow-hidden rounded-sm bg-[#07577a] text-white shadow-md"><div className="border-b border-white/20 px-3 py-2 text-xs font-bold">▣ 3. Sell conditions (optional)</div><div className="m-2 rounded bg-white/10 p-3 text-[11px]"><span className="text-cyan-200">if</span> <span className="rounded bg-white px-2 py-1 text-gray-700">{canvasSellBlocks[0] || 'is available'}</span></div></div>
-                {activeStrategyConfig && <div className="w-[390px] rounded-sm bg-[#07577a] p-3 text-[11px] text-white shadow-md">Active strategy: <strong>{activeStrategyConfig.strategyName}</strong> · stake {activeStrategyConfig.initialStake} · factor {activeStrategyConfig.factor}</div>}
-              </div>
-            </div>
-          </main>
-
-          <aside className="flex w-full shrink-0 flex-col border-t border-gray-200 bg-white shadow-sm md:w-72 md:border-l md:border-t-0">
-            <div className="flex border-b border-gray-200 text-xs font-semibold">{['summary', 'transactions', 'journal'].map((tab) => <button key={tab} onClick={() => setRightPanelTab(tab as 'summary' | 'transactions' | 'journal')} className={`flex-1 py-3 capitalize ${rightPanelTab === tab ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}>{tab}</button>)}</div>
-            <div className="flex-1 p-5 text-center text-xs text-gray-500">{rightPanelTab === 'summary' ? 'When you are ready to trade, hit Run.' : rightPanelTab === 'transactions' ? 'No active contract transactions yet.' : 'System logs and triggers will appear here.'}</div>
-            <div className="grid grid-cols-2 gap-4 border-t border-gray-200 p-4 text-xs"><div><span className="text-gray-500">Current Stake</span><strong className="block text-sm">{stake.toFixed(2)} AUD</strong></div><div><span className="text-gray-500">No. of runs</span><strong className="block text-sm">{botRuns}</strong></div><div><span className="text-gray-500">Total profit/loss</span><strong className={`block text-sm ${botProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{botProfit.toFixed(2)} AUD</strong></div></div>
-            <div className="flex gap-2 border-t border-gray-200 p-3"><button onClick={() => { setBotRuns(0); setBotProfit(0); setIsBotRunning(false); }} className="flex-1 rounded border border-gray-300 py-2 text-xs font-bold">Reset</button><button onClick={() => { const next = !isBotRunning; setIsBotRunning(next); if (next) { setBotRuns((runs) => runs + 1); const outcome = Math.random() > 0.4 ? 'win' : 'loss'; setBotProfit((profit) => profit + (outcome === 'win' ? 5 : -3)); calculateNextStake(outcome); } }} className={`flex-1 rounded py-2 text-xs font-bold text-white ${isBotRunning ? 'bg-rose-600' : 'bg-blue-600'}`}>{isBotRunning ? 'Stop' : 'Run'}</button></div>
-          </aside>
-        </div>
-      )}
-
-      {currentTab === 'bot-builder' && (
-        <div className="fixed inset-0 z-[65] bg-white">
-          <button onClick={() => setCurrentTab('bots')} className="absolute right-4 top-3 z-10 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg hover:bg-slate-700">Back to Bots</button>
-          <iframe title="Deriv Bot Builder" src="/bot-builder/" className="h-full w-full border-0" />
-        </div>
-=======
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {dashboardBots.map((bot) => (
-                <article key={bot.id} className="rounded-2xl border border-slate-800 bg-[#111827] p-5 shadow-lg shadow-slate-950/20">
-                  <div className="mb-4 flex items-center justify-between">
-                    <span className="rounded-full border border-teal-500/30 bg-teal-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-teal-300">
-                      {bot.status}
-                    </span>
-                    <button
-                      onClick={() => setCurrentTab('bot-builder')}
-                      className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-300 transition hover:text-white"
-                    >
-                      Open
-                    </button>
-                  </div>
-
-                  <h2 className="text-lg font-bold text-white">{bot.name}</h2>
-                  <p className="mt-2 text-xs text-slate-400">Last modified: {bot.lastModified}</p>
-
-                  <div className="mt-5 flex items-center justify-between border-t border-slate-800 pt-4 text-xs text-slate-300">
-                    <span>Template</span>
-                    <span className="font-bold text-slate-100">Deriv</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </main>
->>>>>>> ff630fb (Add official Deriv bot builder and bots section)
-      )}
-
-      {/* Official Deriv Bot Builder View */}
       {currentTab === 'bot-builder' && (
         <div className="flex flex-1 flex-col overflow-hidden bg-[#0b1020]">
           <div className="flex items-center justify-between border-b border-slate-800 bg-[#111827] px-4 py-3 text-white">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff444f] text-sm font-black text-white">D</span>
               <div>
-                <p className="text-sm font-extrabold">Deriv Bot Builder</p>
+                <p className="text-sm font-extrabold">{selectedBotTemplate?.name ?? 'Deriv Bot Builder'}</p>
                 <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">official embedded build</p>
               </div>
             </div>
