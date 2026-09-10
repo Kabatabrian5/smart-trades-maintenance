@@ -16,6 +16,17 @@ export default async function handler(request: VercelRequest, response: VercelRe
   try {
     const result = await initiateStkPush(phoneNumber, kesAmount, accountId);
     if (!result.ok || result.payload.ResponseCode !== '0') {
+      console.error('Daraja STK Push rejected', {
+        upstreamStatus: result.status,
+        responseCode: result.payload.ResponseCode,
+        errorCode: result.payload.errorCode,
+        errorMessage: result.payload.errorMessage,
+        responseDescription: result.payload.ResponseDescription,
+        configuredEnvironment: process.env.DARAJA_ENVIRONMENT || 'sandbox',
+        hasShortcode: Boolean(process.env.DARAJA_SHORTCODE),
+        hasPasskey: Boolean(process.env.DARAJA_PASSKEY),
+        hasCallbackUrl: Boolean(process.env.DARAJA_CALLBACK_URL),
+      });
       return response.status(result.status >= 400 ? result.status : 502).json({ error: result.payload.errorMessage || result.payload.ResponseDescription || 'Safaricom STK Push failed' });
     }
     return response.status(200).json({
@@ -25,7 +36,15 @@ export default async function handler(request: VercelRequest, response: VercelRe
       status: 'pending',
     });
   } catch (error) {
-    console.error('Daraja STK Push failed:', error);
+    console.error('Daraja STK Push failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      configuredEnvironment: process.env.DARAJA_ENVIRONMENT || 'sandbox',
+      hasConsumerKey: Boolean(process.env.DARAJA_CONSUMER_KEY),
+      hasConsumerSecret: Boolean(process.env.DARAJA_CONSUMER_SECRET),
+      hasShortcode: Boolean(process.env.DARAJA_SHORTCODE),
+      hasPasskey: Boolean(process.env.DARAJA_PASSKEY),
+      hasCallbackUrl: Boolean(process.env.DARAJA_CALLBACK_URL),
+    });
     return response.status(503).json({ error: error instanceof Error ? error.message : 'Safaricom is not configured' });
   }
 }
