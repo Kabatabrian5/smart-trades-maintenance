@@ -51,6 +51,24 @@ interface BotItem {
   status: 'Unsaved' | 'Saved' | 'Running';
 }
 
+interface BotTemplate {
+  id: string;
+  name: string;
+  file: string;
+  description: string;
+  accent: string;
+}
+
+const BOT_TEMPLATES: BotTemplate[] = [
+  { id: 'accumulators-pro', name: 'Accumulators Pro', file: 'accumulators-pro.xml', description: 'Smart automated trading strategy', accent: 'from-violet-500 to-fuchsia-500' },
+  { id: 'asian-up-down-pro', name: 'Asian Up Down Pro', file: 'asian-up-down-pro.xml', description: 'Smart automated trading strategy', accent: 'from-violet-500 to-fuchsia-500' },
+  { id: 'even-odd-pro', name: 'Even Odd Pro', file: 'even-odd-pro.xml', description: 'Smart automated trading strategy', accent: 'from-violet-500 to-fuchsia-500' },
+  { id: 'matches-differs-pro', name: 'Matches Differs Pro', file: 'matches-differs-pro.xml', description: 'Smart automated trading strategy', accent: 'from-violet-500 to-fuchsia-500' },
+  { id: 'only-ups-down-pro', name: 'Only Ups Downs Pro', file: 'only-ups-down-pro.xml', description: 'Smart automated trading strategy', accent: 'from-violet-500 to-fuchsia-500' },
+  { id: 'over-under-pro', name: 'Over Under Pro', file: 'over-under-pro.xml', description: 'Smart automated trading strategy', accent: 'from-violet-500 to-fuchsia-500' },
+  { id: 'rise-fall-pro', name: 'Rise Fall Pro', file: 'rise-fall-pro.xml', description: 'Smart automated trading strategy', accent: 'from-violet-500 to-fuchsia-500' },
+];
+
 interface DerivAccount {
   loginid: string;
   token: string;
@@ -520,9 +538,8 @@ export default function App() {
   }, [signalMarket]);
 
   // Dashboard & Bot Manager state
-  const [dashboardBots, setDashboardBots] = useState<BotItem[]>([
-    { id: '1', name: 'Untitled Bot', lastModified: '15 Aug 2026', status: 'Unsaved' },
-  ]);
+  const [dashboardBots, setDashboardBots] = useState<BotItem[]>([]);
+  const [selectedBotTemplate, setSelectedBotTemplate] = useState<BotTemplate | null>(null);
 
   // Quick Strategy Modal State
   const [isQuickStrategyOpen, setIsQuickStrategyOpen] = useState(false);
@@ -657,6 +674,11 @@ export default function App() {
     setIsQuickStrategyOpen(false);
     setCurrentTab('bot-builder');
   };
+
+  function loadBotTemplate(template: BotTemplate) {
+    setSelectedBotTemplate(template);
+    setCurrentTab('bot-builder');
+  }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1099,289 +1121,54 @@ export default function App() {
 
       {/* Dashboard View */}
       {currentTab === 'dashboard' && (
-        <main className="flex-1 flex flex-col items-center justify-start bg-[#16161c] overflow-y-auto p-10 space-y-8 animate-in fade-in duration-200">
-          <div className="text-center space-y-2 mt-4">
-            <p className="text-gray-300 text-sm">
-              Import a bot from your computer or Google Drive, build it from scratch, or start with a quick strategy.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-4 gap-6 max-w-3xl w-full">
-            <label className="flex flex-col items-center justify-center bg-[#1b1b24] border border-[#262633] hover:border-teal-500/50 p-6 rounded-2xl cursor-pointer transition-all shadow-md group space-y-3">
-              <span className="text-xs font-semibold text-gray-200">My computer</span>
-              <div className="w-12 h-12 rounded-xl bg-[#222230] flex items-center justify-center text-xl">💻</div>
-              <input type="file" accept=".xml,.json" onChange={handleFileUpload} className="hidden" />
-            </label>
-
-            <button 
-              onClick={handleGoogleSignIn}
-              className="flex flex-col items-center justify-center bg-[#1b1b24] border border-[#262633] hover:border-emerald-500/50 p-6 rounded-2xl cursor-pointer transition-all shadow-md space-y-3 group"
-            >
-              <span className="text-xs font-semibold text-gray-200">Google Drive</span>
-              <div className="w-12 h-12 rounded-xl bg-[#222230] flex items-center justify-center text-xl">📁</div>
-            </button>
-
-            <button 
-              onClick={() => setCurrentTab('bot-builder')}
-              className="flex flex-col items-center justify-center bg-[#1b1b24] border border-[#262633] hover:border-sky-500/50 p-6 rounded-2xl cursor-pointer transition-all shadow-md space-y-3 group"
-            >
-              <span className="text-xs font-semibold text-gray-200">Bot Builder</span>
-              <div className="w-12 h-12 rounded-xl bg-[#222230] flex items-center justify-center text-xl">🧩</div>
-            </button>
-
-            <button 
-              onClick={() => setIsQuickStrategyOpen(true)}
-              className="flex flex-col items-center justify-center bg-[#1b1b24] border border-[#262633] hover:border-purple-500/50 p-6 rounded-2xl cursor-pointer transition-all shadow-md space-y-3 group"
-            >
-              <span className="text-xs font-semibold text-gray-200">Quick strategy</span>
-              <div className="w-12 h-12 rounded-xl bg-[#222230] flex items-center justify-center text-xl">⚡</div>
-            </button>
-          </div>
-
-          <div className="max-w-3xl w-full bg-[#1b1b24] border border-[#262633] rounded-2xl p-6 shadow-inner space-y-4">
-            <h3 className="text-sm font-bold text-gray-300">Your bots:</h3>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="text-gray-400 border-b border-[#262633] pb-2">
-                  <th className="pb-3 font-semibold">Bot name</th>
-                  <th className="pb-3 font-semibold">Last modified</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                  <th className="pb-3 font-semibold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#262633]/50">
-                {dashboardBots.map((bot) => (
-                  <tr key={bot.id} className="hover:bg-[#22222c] transition-colors">
-                    <td className="py-3.5 font-medium text-white">{bot.name}</td>
-                    <td className="py-3.5 text-gray-400">{bot.lastModified}</td>
-                    <td className="py-3.5 text-amber-400 font-mono text-[11px]">{bot.status}</td>
-                    <td className="py-3.5 text-right space-x-3">
-                      <button onClick={() => handleDuplicateBot(bot)} title="Duplicate">📄</button>
-                      <button onClick={() => alert(`Saving ${bot.name}`)} title="Save">💾</button>
-                      <button onClick={() => handleDeleteBot(bot.id)} title="Delete">🗑️</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <main className="flex-1 overflow-y-auto bg-[#edf1f3] p-6 text-white sm:p-8">
+          <div className="mx-auto max-w-[1500px]">
+            <div className="mb-6 rounded-b-3xl bg-gradient-to-r from-[#111827] via-[#172338] to-[#0b3438] p-7 shadow-xl"><p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">Bots</p><h1 className="mt-2 text-3xl font-black">Pre-built strategies</h1><div className="mt-6 flex gap-3"><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">{BOT_TEMPLATES.length}</strong><span className="text-[10px] text-slate-300">AI Bots</span></div><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">24/7</strong><span className="text-[10px] text-slate-300">Automation</span></div><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">LIVE</strong><span className="text-[10px] text-slate-300">Execution</span></div></div></div>
+            <div className="mb-6 flex flex-wrap gap-3"><label className="cursor-pointer rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm"><span>Upload XML</span><input type="file" accept=".xml,.json" onChange={handleFileUpload} className="hidden" /></label><button onClick={handleGoogleSignIn} className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm">Import from Drive</button><button onClick={() => setCurrentTab('bot-builder')} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm">Open Bot Builder</button></div>
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">{BOT_TEMPLATES.map((template) => <article key={template.id} className={`rounded-2xl bg-gradient-to-br ${template.accent} p-4 shadow-lg`}><div className="flex items-start justify-between"><div className="grid h-14 w-14 place-items-center rounded-xl bg-[#071b2c] text-2xl shadow-inner">🤖</div><span className="rounded-full bg-emerald-400 px-3 py-1 text-[10px] font-black text-emerald-950">FREE</span></div><h2 className="mt-4 text-base font-black">{template.name}</h2><p className="mt-1 text-xs text-white/80">{template.description}</p><p className="mt-4 text-[10px] text-white/80">Deriv Blockly XML · Auto Trade</p><button onClick={() => loadBotTemplate(template)} className="mt-3 w-full rounded-xl bg-blue-500 px-4 py-3 text-xs font-black text-white shadow-lg hover:bg-blue-400">Load Bot</button></article>)}</div>
+            {dashboardBots.length > 0 && <section className="mt-8 rounded-2xl bg-[#111827] p-5"><h2 className="text-sm font-black">Imported bots</h2><div className="mt-3 space-y-2">{dashboardBots.map((bot) => <div key={bot.id} className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-3 text-xs"><span>{bot.name}</span><span className="flex gap-3"><button onClick={() => handleDuplicateBot(bot)} className="text-cyan-300">Duplicate</button><button onClick={() => handleDeleteBot(bot.id)} className="text-rose-300">Delete</button></span></div>)}</div></section>}
           </div>
         </main>
       )}
 
       {/* Bot Builder Workspace View */}
       {currentTab === 'bot-builder' && (
-        <div className="flex flex-1 flex-col overflow-y-auto bg-[#f4f5f7] pb-16 text-gray-800 md:flex-row md:overflow-hidden md:pb-0">
-          <div className="w-full bg-white border-b border-gray-200 flex flex-col shrink-0 shadow-sm md:w-64 md:border-b-0 md:border-r">
-            <div className="p-3 border-b border-gray-200">
-              <button 
-                onClick={() => setIsQuickStrategyOpen(true)} 
-                className="w-full bg-[#2563eb] hover:bg-blue-600 text-white text-xs font-bold py-2.5 px-4 rounded-lg shadow transition-all cursor-pointer flex items-center justify-center space-x-2"
-              >
-                <span>Quick strategy</span>
-              </button>
+        <div className="flex flex-1 flex-col overflow-hidden bg-[#f7f8fa] pb-16 text-gray-800 md:flex-row md:pb-0">
+          <aside className="flex w-full shrink-0 flex-col border-b border-gray-200 bg-white shadow-sm md:w-64 md:border-b-0 md:border-r">
+            <button onClick={() => setIsQuickStrategyOpen(true)} className="m-2.5 rounded-sm bg-[#3f82ed] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#3476df]">Quick strategy</button>
+            <div className="border-b border-gray-200 px-4 pb-3"><p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Loaded bot</p><p className="mt-1 truncate text-xs font-black text-slate-800">{selectedBotTemplate?.name || 'Blank workspace'}</p>{selectedBotTemplate && <button onClick={() => window.open(`/bots/${selectedBotTemplate.file}`, '_blank', 'noopener,noreferrer')} className="mt-2 text-[10px] font-bold text-blue-600 hover:underline">Open XML template</button>}</div>
+            <div className="flex items-center justify-between border-y border-gray-200 px-4 py-3"><span className="text-xs font-bold">Blocks menu</span><button onClick={() => setCurrentTab('dashboard')} className="text-[11px] text-blue-600 hover:underline">Exit</button></div>
+            <label className="mx-3 my-3 flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-xs text-gray-400"><span>⌕</span><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search" className="w-full bg-transparent text-gray-800 outline-none" /></label>
+            <div className="flex max-h-56 flex-col overflow-y-auto text-xs font-semibold md:max-h-none">
+              {['Trade parameters', 'Purchase conditions', 'Sell conditions (optional)', 'Restart trading conditions', 'Analysis', 'Utility'].map((cat) => <button key={cat} onClick={() => { setBuilderCategory(cat); if (cat === 'Purchase conditions' || cat === 'Sell conditions (optional)') setActiveCategoryModal(cat); }} className={`flex items-center justify-between border-b border-gray-100 px-4 py-3.5 text-left ${builderCategory === cat ? 'bg-[#eef4ff] text-[#2563eb]' : 'text-gray-700 hover:bg-gray-50'}`}><span>{cat}</span><span className="text-gray-400">⌄</span></button>)}
             </div>
+            <div className="mt-auto border-t border-gray-200 p-3"><button className="w-full rounded-sm border border-amber-400 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-700">Risk Disclaimer</button></div>
+          </aside>
 
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-700">Blocks menu</span>
-              <button onClick={() => setCurrentTab('dashboard')} className="text-[11px] text-blue-600 hover:underline cursor-pointer">← Exit</button>
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <div className="flex h-11 shrink-0 items-center gap-1 border-b border-gray-300 bg-white px-3 text-gray-600 shadow-sm">
+              {['↻', '□', '▣', '⚑', '⌁', '↶', '↷', '⊕', '⊖'].map((icon, index) => <button key={index} title={['Refresh', 'Open', 'Save', 'Align', 'Chart', 'Undo', 'Redo', 'Zoom in', 'Zoom out'][index]} className="rounded px-2 py-1.5 text-sm hover:bg-gray-100">{icon}</button>)}
             </div>
-
-            <div className="p-3">
-              <div className="flex items-center bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 space-x-2">
-                <span className="text-gray-400 text-xs">🔍</span>
-                <input type="text" placeholder="Search" className="w-full bg-transparent text-xs text-gray-800 outline-none" />
+            <div className="relative flex-1 overflow-auto bg-[radial-gradient(#dce1e8_1px,transparent_1px)] [background-size:18px_18px] p-6">
+              <div className="flex min-w-[940px] flex-wrap items-start gap-5">
+                <div className="w-[390px] overflow-hidden rounded-sm bg-[#07577a] text-white shadow-md">
+                  <div className="border-b border-white/20 px-3 py-2 text-xs font-bold">▣ 1. Trade parameters</div>
+                  <div className="space-y-2 p-2 text-[11px]"><div className="rounded bg-white/10 p-2">Market: <span className="rounded bg-white px-2 py-1 text-gray-700">Derived</span> › <span className="rounded bg-white px-2 py-1 text-gray-700">Continuous Indices</span> › <span className="rounded bg-white px-2 py-1 text-gray-700">Volatility 10 Index</span></div><div className="rounded bg-white/10 p-2">Trade Type: <span className="rounded bg-white px-2 py-1 text-gray-700">Up/Down</span> › <span className="rounded bg-white px-2 py-1 text-gray-700">Rise/Fall</span></div><div className="rounded bg-white/10 p-2">Contract Type: <span className="rounded bg-white px-2 py-1 text-gray-700">Both</span></div><div className="rounded bg-white/10 p-2">Default Candle Interval: <span className="rounded bg-white px-2 py-1 text-gray-700">1 minute</span></div></div>
+                </div>
+                <div className="w-[360px] overflow-hidden rounded-sm bg-[#07577a] text-white shadow-md"><div className="border-b border-white/20 px-3 py-2 text-xs font-bold">▣ 4. Restart trading conditions</div><div className="m-2 rounded bg-white/10 p-3 text-[11px]"><span className="mr-2 text-cyan-200">if</span> Martingale Trade Again After Purchase <span className="ml-2 rounded bg-white px-2 py-1 text-gray-700">with: martingale:profit</span><div className="mt-3 rounded bg-white/10 px-2 py-1">Trade again <button className="float-right rounded-full bg-white/20 px-1.5">+</button></div></div></div>
+                <div className="w-[390px] overflow-hidden rounded-sm bg-[#07577a] text-white shadow-md"><div className="border-b border-white/20 px-3 py-2 text-xs font-bold">▣ 2. Purchase conditions</div><div className="m-2 rounded bg-white/10 p-3 text-[11px]"><span className="text-cyan-200">Purchase</span> <span className="rounded bg-white px-2 py-1 text-gray-700">{canvasPurchaseBlocks[0] || 'Rise'}</span><button onClick={() => setActiveCategoryModal('Purchase conditions')} className="float-right rounded-full bg-white/20 px-1.5">+</button></div></div>
+                <div className="w-[360px] overflow-hidden rounded-sm bg-[#07577a] text-white shadow-md"><div className="border-b border-white/20 px-3 py-2 text-xs font-bold">▣ 3. Sell conditions (optional)</div><div className="m-2 rounded bg-white/10 p-3 text-[11px]"><span className="text-cyan-200">if</span> <span className="rounded bg-white px-2 py-1 text-gray-700">{canvasSellBlocks[0] || 'is available'}</span></div></div>
+                {activeStrategyConfig && <div className="w-[390px] rounded-sm bg-[#07577a] p-3 text-[11px] text-white shadow-md">Active strategy: <strong>{activeStrategyConfig.strategyName}</strong> · stake {activeStrategyConfig.initialStake} · factor {activeStrategyConfig.factor}</div>}
               </div>
             </div>
+          </main>
 
-            <div className="flex max-h-64 flex-col text-xs font-medium divide-y divide-gray-100 overflow-y-auto md:max-h-none">
-              {[
-                'Trade parameters', 
-                'Purchase conditions', 
-                'Sell conditions (optional)', 
-                'Restart trading conditions', 
-                'Analysis', 
-                'Utility'
-              ].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    setBuilderCategory(cat);
-                    if (cat === 'Purchase conditions' || cat === 'Sell conditions (optional)') {
-                      setActiveCategoryModal(cat);
-                    }
-                  }}
-                  className={`text-left px-4 py-3.5 transition-colors cursor-pointer flex items-center justify-between ${builderCategory === cat ? 'bg-blue-50 text-blue-600 font-bold border-l-4 border-blue-600' : 'text-gray-600 hover:bg-gray-50'}`}
-                >
-                  <span>{cat}</span>
-                  <span className="text-gray-400">⌄</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="p-4 mt-auto border-t border-gray-200">
-              <button className="w-full bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold py-2 px-3 rounded-lg shadow transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
-                <span>⚠️ Risk Disclaimer</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex min-h-[420px] w-full flex-col overflow-hidden bg-[#f8f9fa] relative md:min-h-0 md:flex-1">
-            <div className="h-12 bg-white border-b border-gray-200 flex items-center px-4 space-x-3 shrink-0 overflow-x-auto shadow-sm">
-              <button title="Undo" className="p-1.5 hover:bg-gray-100 rounded text-gray-600">🔄</button>
-              <button title="Folder" className="p-1.5 hover:bg-gray-100 rounded text-gray-600">📁</button>
-              <button title="Save" className="p-1.5 hover:bg-gray-100 rounded text-gray-600">💾</button>
-              <button title="List" className="p-1.5 hover:bg-gray-100 rounded text-gray-600">📊</button>
-              <div className="h-4 w-[1px] bg-gray-300"></div>
-              <button title="Undo Action" className="p-1.5 hover:bg-gray-100 rounded text-gray-600">↩️</button>
-              <button title="Redo Action" className="p-1.5 hover:bg-gray-100 rounded text-gray-600">↪️</button>
-              <button title="Delete All" className="p-1.5 hover:bg-gray-100 rounded text-gray-600">🗑️</button>
-            </div>
-
-            <div className="flex-1 overflow-auto p-3 space-y-4 relative sm:p-8 sm:space-y-6">
-              <div className="bg-[#1e293b] text-white rounded-xl p-4 shadow-md w-full max-w-2xl space-y-3 border border-slate-700">
-                <div className="text-xs font-bold text-teal-400">1. Trade parameters</div>
-                <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
-                  <div className="bg-[#0f172a] p-2 rounded border border-slate-700">Market: Derived</div>
-                  <div className="bg-[#0f172a] p-2 rounded border border-slate-700">Continuous Indices</div>
-                  <div className="bg-[#0f172a] p-2 rounded border border-slate-700">Volatility 10 Index</div>
-                </div>
-                <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                  <div className="bg-[#0f172a] p-2 rounded border border-slate-700">Trade Type: Up/Down</div>
-                  <div className="bg-[#0f172a] p-2 rounded border border-slate-700">Contract Type: Both</div>
-                </div>
-                <div className="text-[11px] text-gray-300">Default Candle Interval: <span className="bg-[#0f172a] px-2 py-1 rounded border border-slate-700 ml-1">1 minute</span></div>
-              </div>
-
-              {/* Rendered Purchase Conditions Block on Canvas with nested Purchase Blocks */}
-              <div className="bg-[#1e293b] text-white rounded-xl p-4 shadow-md w-full max-w-2xl space-y-3 border border-blue-500/50">
-                <div className="text-xs font-bold text-blue-400">2. Purchase conditions</div>
-                <div className="space-y-2">
-                  {canvasPurchaseBlocks.map((blockType, idx) => (
-                    <div key={idx} className="bg-[#0f172a] p-2.5 rounded border border-slate-700 flex items-center justify-between text-xs font-mono">
-                      <span>Purchase {blockType}</span>
-                      <button 
-                        onClick={() => setCanvasPurchaseBlocks(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-rose-400 hover:text-rose-300 text-xs font-sans cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {canvasPurchaseBlocks.length === 0 && (
-                    <div className="text-[11px] text-gray-400 italic">No purchase blocks added yet. Click 'Purchase conditions' in the left menu to add one.</div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-[#1e293b] text-white rounded-xl p-4 shadow-md w-full max-w-2xl space-y-3 border border-emerald-500/50">
-                <div className="text-xs font-bold text-emerald-400">3. Sell conditions (optional)</div>
-                <div className="space-y-2">
-                  <div className="bg-[#0f172a] p-2.5 rounded border border-slate-700 text-xs font-mono">
-                    <div className="flex items-center gap-2 text-gray-300">
-                      <span className="text-emerald-400">if</span>
-                      <span className="text-gray-500">then</span>
-                    </div>
-                  </div>
-                  {canvasSellBlocks.map((blockType, idx) => (
-                    <div key={idx} className="bg-[#0f172a] p-2.5 rounded border border-slate-700 flex items-center justify-between text-xs font-mono">
-                      <span>Sell {blockType}</span>
-                      <button
-                        onClick={() => setCanvasSellBlocks(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-rose-400 hover:text-rose-300 text-xs font-sans cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {canvasSellBlocks.length === 0 && (
-                    <div className="text-[11px] text-gray-400 italic">Add a sell block inside the condition.</div>
-                  )}
-                </div>
-              </div>
-
-              {activeStrategyConfig && (
-                <div className="bg-[#1e293b] text-white rounded-xl p-4 shadow-md w-full max-w-2xl space-y-2 border border-blue-500/50">
-                  <div className="text-xs font-bold text-blue-400">Active Strategy Loaded: {activeStrategyConfig.strategyName}</div>
-                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-300">
-                    <div className="bg-[#0f172a] p-2 rounded border border-slate-700">Initial Stake: {activeStrategyConfig.initialStake}</div>
-                    <div className="bg-[#0f172a] p-2 rounded border border-slate-700">Factor/Step: {activeStrategyConfig.factor}</div>
-                    <div className="bg-[#0f172a] p-2 rounded border border-slate-700">Max Limit: {activeStrategyConfig.maxLimit}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="w-full bg-white border-t border-gray-200 flex min-h-[280px] flex-col justify-between shrink-0 shadow-sm md:w-80 md:min-h-0 md:border-l md:border-t-0">
-            <div>
-              <div className="flex border-b border-gray-200 text-xs font-semibold">
-                {['summary', 'transactions', 'journal'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setRightPanelTab(tab as any)}
-                    className={`flex-1 py-3 text-center capitalize transition-colors cursor-pointer ${rightPanelTab === tab ? 'border-b-2 border-blue-600 text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-800'}`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-
-              <div className="p-6 text-center space-y-6">
-                {rightPanelTab === 'summary' && (
-                  <div className="py-12 text-gray-500 text-xs leading-relaxed">
-                    When you're ready to trade, hit <span className="text-blue-600 font-bold">Run</span>.<br />
-                    You'll be able to track your bot's performance here.
-                  </div>
-                )}
-                {rightPanelTab === 'transactions' && (
-                  <div className="py-12 text-gray-500 text-xs">No active contract transactions yet.</div>
-                )}
-                {rightPanelTab === 'journal' && (
-                  <div className="py-12 text-gray-500 text-xs">System logs and triggers will appear here.</div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4 text-left border-t border-gray-200 pt-4 text-xs">
-                  <div>
-                    <div className="text-gray-500">Current Stake</div>
-                    <div className="font-bold text-sm text-gray-800">{stake.toFixed(2)} AUD</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-500">No. of runs</div>
-                    <div className="font-bold text-sm text-gray-800">{botRuns}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-500">Total profit/loss</div>
-                    <div className={`font-bold text-sm ${botProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{botProfit.toFixed(2)} AUD</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-gray-200 flex space-x-3 items-center">
-              <button 
-                onClick={() => { setBotRuns(0); setBotProfit(0); setIsBotRunning(false); }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
-              >
-                Reset
-              </button>
-              <button 
-                onClick={() => {
-                  const newRunningState = !isBotRunning;
-                  setIsBotRunning(newRunningState);
-                  if (newRunningState) {
-                    setBotRuns(prev => prev + 1);
-                    const outcome = Math.random() > 0.4 ? 'win' : 'loss';
-                    const delta = outcome === 'win' ? 5 : -3;
-                    setBotProfit(prev => prev + delta);
-                    calculateNextStake(outcome);
-                  }
-                }}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold cursor-pointer ${isBotRunning ? 'bg-rose-600 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30'}`}
-              >
-                {isBotRunning ? 'Stop' : 'Run'}
-              </button>
-            </div>
-          </div>
+          <aside className="flex w-full shrink-0 flex-col border-t border-gray-200 bg-white shadow-sm md:w-72 md:border-l md:border-t-0">
+            <div className="flex border-b border-gray-200 text-xs font-semibold">{['summary', 'transactions', 'journal'].map((tab) => <button key={tab} onClick={() => setRightPanelTab(tab as 'summary' | 'transactions' | 'journal')} className={`flex-1 py-3 capitalize ${rightPanelTab === tab ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}>{tab}</button>)}</div>
+            <div className="flex-1 p-5 text-center text-xs text-gray-500">{rightPanelTab === 'summary' ? 'When you are ready to trade, hit Run.' : rightPanelTab === 'transactions' ? 'No active contract transactions yet.' : 'System logs and triggers will appear here.'}</div>
+            <div className="grid grid-cols-2 gap-4 border-t border-gray-200 p-4 text-xs"><div><span className="text-gray-500">Current Stake</span><strong className="block text-sm">{stake.toFixed(2)} AUD</strong></div><div><span className="text-gray-500">No. of runs</span><strong className="block text-sm">{botRuns}</strong></div><div><span className="text-gray-500">Total profit/loss</span><strong className={`block text-sm ${botProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{botProfit.toFixed(2)} AUD</strong></div></div>
+            <div className="flex gap-2 border-t border-gray-200 p-3"><button onClick={() => { setBotRuns(0); setBotProfit(0); setIsBotRunning(false); }} className="flex-1 rounded border border-gray-300 py-2 text-xs font-bold">Reset</button><button onClick={() => { const next = !isBotRunning; setIsBotRunning(next); if (next) { setBotRuns((runs) => runs + 1); const outcome = Math.random() > 0.4 ? 'win' : 'loss'; setBotProfit((profit) => profit + (outcome === 'win' ? 5 : -3)); calculateNextStake(outcome); } }} className={`flex-1 rounded py-2 text-xs font-bold text-white ${isBotRunning ? 'bg-rose-600' : 'bg-blue-600'}`}>{isBotRunning ? 'Stop' : 'Run'}</button></div>
+          </aside>
         </div>
       )}
 
