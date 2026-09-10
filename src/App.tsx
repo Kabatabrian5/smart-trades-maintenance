@@ -1121,6 +1121,13 @@ export default function App() {
 
       {/* Dashboard View */}
       {currentTab === 'dashboard' && (
+        <main className="flex-1 overflow-y-auto bg-[#16161c] p-6 text-white sm:p-10">
+          <div className="mx-auto max-w-5xl"><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">Smart Trades</p><h1 className="mt-2 text-3xl font-black">Trading dashboard</h1><p className="mt-3 max-w-2xl text-sm text-gray-400">Monitor your Deriv connection, open positions, and automated bot workspace from one place.</p><div className="mt-8 grid gap-4 sm:grid-cols-3"><button onClick={() => setCurrentTab('manual-trading')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">▦</span><strong className="mt-4 block text-sm">Manual trading</strong><span className="mt-1 block text-xs text-gray-500">Open the live trading workspace</span></button><button onClick={() => setCurrentTab('bots')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">🤖</span><strong className="mt-4 block text-sm">Bots</strong><span className="mt-1 block text-xs text-gray-500">Browse pre-built XML strategies</span></button><button onClick={() => setCurrentTab('positions')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">◫</span><strong className="mt-4 block text-sm">Positions</strong><span className="mt-1 block text-xs text-gray-500">Review active and settled trades</span></button></div></div>
+        </main>
+      )}
+
+      {/* Bots View */}
+      {currentTab === 'bots' && (
         <main className="flex-1 overflow-y-auto bg-[#edf1f3] p-6 text-white sm:p-8">
           <div className="mx-auto max-w-[1500px]">
             <div className="mb-6 rounded-b-3xl bg-gradient-to-r from-[#111827] via-[#172338] to-[#0b3438] p-7 shadow-xl"><p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">Bots</p><h1 className="mt-2 text-3xl font-black">Pre-built strategies</h1><div className="mt-6 flex gap-3"><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">{BOT_TEMPLATES.length}</strong><span className="text-[10px] text-slate-300">AI Bots</span></div><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">24/7</strong><span className="text-[10px] text-slate-300">Automation</span></div><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">LIVE</strong><span className="text-[10px] text-slate-300">Execution</span></div></div></div>
@@ -1169,6 +1176,13 @@ export default function App() {
             <div className="grid grid-cols-2 gap-4 border-t border-gray-200 p-4 text-xs"><div><span className="text-gray-500">Current Stake</span><strong className="block text-sm">{stake.toFixed(2)} AUD</strong></div><div><span className="text-gray-500">No. of runs</span><strong className="block text-sm">{botRuns}</strong></div><div><span className="text-gray-500">Total profit/loss</span><strong className={`block text-sm ${botProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{botProfit.toFixed(2)} AUD</strong></div></div>
             <div className="flex gap-2 border-t border-gray-200 p-3"><button onClick={() => { setBotRuns(0); setBotProfit(0); setIsBotRunning(false); }} className="flex-1 rounded border border-gray-300 py-2 text-xs font-bold">Reset</button><button onClick={() => { const next = !isBotRunning; setIsBotRunning(next); if (next) { setBotRuns((runs) => runs + 1); const outcome = Math.random() > 0.4 ? 'win' : 'loss'; setBotProfit((profit) => profit + (outcome === 'win' ? 5 : -3)); calculateNextStake(outcome); } }} className={`flex-1 rounded py-2 text-xs font-bold text-white ${isBotRunning ? 'bg-rose-600' : 'bg-blue-600'}`}>{isBotRunning ? 'Stop' : 'Run'}</button></div>
           </aside>
+        </div>
+      )}
+
+      {currentTab === 'bot-builder' && (
+        <div className="fixed inset-0 z-[65] bg-white">
+          <button onClick={() => setCurrentTab('bots')} className="absolute right-4 top-3 z-10 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg hover:bg-slate-700">Back to Bots</button>
+          <iframe title="Deriv Bot Builder" src="/bot-builder/" className="h-full w-full border-0" />
         </div>
       )}
 
