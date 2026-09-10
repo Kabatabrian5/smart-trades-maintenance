@@ -75,13 +75,8 @@ export default function Header({ currentTab, setCurrentTab }: HeaderProps) {
         </nav>
       </div>
 
-      {/* Right section: Cashier, Sign In & Sign Up Action Buttons */}
+      {/* Right section: Sign In & Sign Up Action Buttons */}
       <div className="flex items-center space-x-3">
-        <button className="flex items-center space-x-2 px-4 py-2 bg-emerald-950/40 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-900/40 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer">
-          <span className="text-sm">💳</span>
-          <span>Cashier</span>
-        </button>
-
         <a href="https://smart-trades.site" className="px-4 py-2 bg-[#1b1b24] hover:bg-[#252533] border border-[#2e2e3d] text-gray-200 rounded-xl text-xs font-bold transition-all cursor-pointer">
           Sign in
         </a>
