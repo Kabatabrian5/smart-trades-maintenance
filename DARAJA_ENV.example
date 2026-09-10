@@ -1,0 +1,8 @@
+# Daraja sandbox configuration. Keep real values in Vercel/server environment variables.
+DARAJA_ENVIRONMENT=sandbox
+DARAJA_CONSUMER_KEY=
+DARAJA_CONSUMER_SECRET=
+DARAJA_SHORTCODE=
+DARAJA_PASSKEY=
+DARAJA_TRANSACTION_TYPE=CustomerPayBillOnline
+DARAJA_CALLBACK_URL=https://smart-trades.site/api/mpesa-callback

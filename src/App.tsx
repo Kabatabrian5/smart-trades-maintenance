@@ -187,7 +187,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots'>('manual-trading');
   const [isCashierOpen, setIsCashierOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const [cashierTab] = useState<'deposit' | 'withdraw' | 'history'>('history');
+  const [cashierTab, setCashierTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
   const [cashierPhone, setCashierPhone] = useState('');
   const [cashierAmount, setCashierAmount] = useState('');
   const [cashierStatus, setCashierStatus] = useState('');
@@ -342,25 +342,25 @@ export default function App() {
     setCashierStatus('Sending M-Pesa prompt...');
     try {
       const phoneNumber = cashierPhone.replace(/\D/g, '').replace(/^0/, '254');
-      const depositResponse = await fetch('/api/deripay-deposit', {
+      const depositResponse = await fetch('/api/mpesa-stk-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber, usdAmount: cashierAmount, loginid: account.loginid, userToken: account.token }),
+        body: JSON.stringify({ phoneNumber, kesAmount: cashierAmount, accountId: account.loginid }),
       });
-      const payload = await depositResponse.json().catch(() => ({})) as { message?: string; error?: string; transactionId?: string };
+      const payload = await depositResponse.json().catch(() => ({})) as { message?: string; error?: string; checkoutRequestId?: string };
       if (!depositResponse.ok) throw new Error(payload.error || 'Deposit request failed');
       setCashierStatus(payload.message || 'M-Pesa prompt sent. Complete it on your phone.');
-      if (payload.transactionId) {
+      if (payload.checkoutRequestId) {
         addTransaction({
-          id: payload.transactionId,
+          id: payload.checkoutRequestId,
           type: 'deposit',
           amount: Number(cashierAmount) || 0,
-          currency: account.currency,
+          currency: 'KES',
           phone: phoneNumber,
           status: 'pending',
           createdAt: Date.now(),
         });
-        pollTransactionStatus(payload.transactionId);
+        pollTransactionStatus(payload.checkoutRequestId);
       }
     } catch (error) {
       setCashierStatus(error instanceof Error ? error.message : 'Deposit request failed');
@@ -399,22 +399,18 @@ export default function App() {
     });
   }
 
-  // Deripay's deposit call only confirms that the M-Pesa prompt was sent, not that money
-  // actually settled. Poll GET /api/deripay-status until Deripay reports a final state
-  // (completed/failed), then refresh the Deriv balance only once settlement is confirmed.
   function pollTransactionStatus(transactionId: string, attempt = 0) {
     const maxAttempts = 20; // roughly 2.5 minutes at 8s intervals
     if (attempt >= maxAttempts) return;
     setTimeout(async () => {
       try {
-        const statusResponse = await fetch(`/api/deripay-status?transactionId=${encodeURIComponent(transactionId)}`);
+        const statusResponse = await fetch(`/api/mpesa-status?checkoutRequestId=${encodeURIComponent(transactionId)}`);
         const statusPayload = await statusResponse.json().catch(() => ({})) as { status?: string; error?: string };
         if (!statusResponse.ok) throw new Error(statusPayload.error || 'Status check failed');
         const normalizedStatus = (statusPayload.status || '').toLowerCase();
         if (['completed', 'success', 'successful'].includes(normalizedStatus)) {
           updateTransactionStatus(transactionId, 'completed');
-          setCashierStatus('Deposit confirmed. Refreshing balance...');
-          derivService.send({ balance: 1, subscribe: 1 }).catch(() => {});
+          setCashierStatus('M-Pesa payment confirmed. Deriv crediting is not connected yet.');
           return;
         }
         if (['failed', 'cancelled', 'canceled'].includes(normalizedStatus)) {
@@ -1667,9 +1663,9 @@ export default function App() {
           <section className="w-full max-w-md rounded-2xl border border-[#30303d] bg-[#17171f] p-6 text-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cashier-title" onClick={(event) => event.stopPropagation()}>
             <div className="mb-5 flex items-start justify-between"><div><p className="text-[10px] font-bold tracking-[0.18em] text-emerald-400">{account.loginid}</p><h2 id="cashier-title" className="mt-2 text-2xl font-extrabold">Cashier</h2></div><button onClick={() => setIsCashierOpen(false)} className="text-2xl text-gray-400 hover:text-white" aria-label="Close cashier">&times;</button></div>
             <div className="rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-xs text-gray-400">Available balance</p><p className="mt-1 text-2xl font-extrabold text-emerald-400">{account.balance === null ? '--' : account.balance.toFixed(2)} {account.currency}</p></div>
-            <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-center"><p className="text-lg font-extrabold text-amber-300">Coming soon</p><p className="mt-2 text-xs leading-5 text-gray-400">Use Deriv&apos;s official account funding pages while Smart Trades cashier tools are being prepared.</p><div className="mt-4 flex gap-2"><a href="https://home.deriv.com/dashboard/deposit?from=home&amp;depositSheet=1&amp;returnTo=%2Fhome&amp;currency=USD" target="_blank" rel="noreferrer" className="flex-1 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-[#071217] transition hover:bg-emerald-400">Deposit</a><a href="https://home.deriv.com/dashboard/withdraw/currency/USD?from=more" target="_blank" rel="noreferrer" className="flex-1 rounded-xl border border-slate-600 px-3 py-2 text-xs font-bold text-gray-200 transition hover:border-emerald-400">Withdraw</a></div></div>
-            {cashierTab === 'history' ? (cashierTransactions.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-[#30303d] p-8 text-center text-xs text-gray-500">No transactions</div> : <div className="mt-4 space-y-2">{cashierTransactions.map((tx) => <div key={tx.id} className="flex items-center justify-between rounded-xl border border-[#30303d] bg-[#121217] p-3"><div><p className="text-xs font-bold capitalize text-gray-200">{tx.type} · {tx.phone}</p><p className="mt-0.5 text-[10px] text-gray-500">{new Date(tx.createdAt).toLocaleString()}</p></div><div className="text-right"><p className="text-sm font-bold text-white">{tx.amount.toFixed(2)} {tx.currency}</p><p className={`text-[10px] font-bold capitalize ${tx.status === 'completed' ? 'text-emerald-400' : tx.status === 'failed' ? 'text-rose-400' : 'text-amber-400'}`}>{tx.status}</p></div></div>)}</div>) : <div className="mt-4 rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-sm font-bold text-gray-200">{cashierTab === 'deposit' ? 'Pay with M-Pesa' : 'Withdraw to M-Pesa'}</p><label className="mt-4 block text-[10px] font-bold uppercase tracking-wider text-gray-500">Phone</label><input value={cashierPhone} onChange={(event) => setCashierPhone(event.target.value)} className="mt-1 w-full rounded-lg border border-[#30303d] bg-[#17171f] px-3 py-2 text-sm text-white outline-none" inputMode="tel" placeholder="07XX XXX XXX" /><label className="mt-3 block text-[10px] font-bold uppercase tracking-wider text-gray-500">Amount {account.currency} · min 5</label><input value={cashierAmount} onChange={(event) => setCashierAmount(event.target.value)} className="mt-1 w-full rounded-lg border border-[#30303d] bg-[#17171f] px-3 py-2 text-sm text-white outline-none" type="number" min="5" placeholder="0.00" /><div className="mt-3 flex gap-1.5">{[5, 10, 20, 50, 100].map((amount) => <button key={amount} onClick={() => setCashierAmount(String(amount))} className="rounded-md border border-[#30303d] px-2 py-1 text-[10px] text-gray-400 hover:border-emerald-400 hover:text-emerald-300">${amount}</button>)}</div><button disabled={cashierTab !== 'deposit' || isCashierSubmitting} onClick={() => void handleCashierDeposit()} className="mt-4 w-full rounded-lg bg-emerald-500/20 px-3 py-2 text-xs font-bold text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50">{cashierTab === 'deposit' ? (isCashierSubmitting ? 'Sending prompt...' : 'Pay with M-Pesa') : 'Request withdrawal (coming soon)'}</button>{cashierStatus && <p className="mt-3 text-center text-[10px] text-gray-400">{cashierStatus}</p>}</div>}
-            <p className="mt-4 text-center text-[10px] text-gray-600">Powered by DeriPay</p>
+            <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-[#121217] p-1">{(['deposit', 'withdraw', 'history'] as const).map((tab) => <button key={tab} onClick={() => setCashierTab(tab)} className={`rounded-lg px-2 py-2 text-xs font-bold capitalize ${cashierTab === tab ? 'bg-emerald-500/20 text-emerald-300' : 'text-gray-500 hover:text-gray-200'}`}>{tab}</button>)}</div>
+            {cashierTab === 'history' ? (cashierTransactions.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-[#30303d] p-8 text-center text-xs text-gray-500">No transactions</div> : <div className="mt-4 space-y-2">{cashierTransactions.map((tx) => <div key={tx.id} className="flex items-center justify-between rounded-xl border border-[#30303d] bg-[#121217] p-3"><div><p className="text-xs font-bold capitalize text-gray-200">{tx.type} · {tx.phone}</p><p className="mt-0.5 text-[10px] text-gray-500">{new Date(tx.createdAt).toLocaleString()}</p></div><div className="text-right"><p className="text-sm font-bold text-white">{tx.amount.toFixed(2)} {tx.currency}</p><p className={`text-[10px] font-bold capitalize ${tx.status === 'completed' ? 'text-emerald-400' : tx.status === 'failed' ? 'text-rose-400' : 'text-amber-400'}`}>{tx.status}</p></div></div>)}</div>) : <div className="mt-4 rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-sm font-bold text-gray-200">{cashierTab === 'deposit' ? 'Pay with M-Pesa' : 'Withdraw to M-Pesa'}</p><label className="mt-4 block text-[10px] font-bold uppercase tracking-wider text-gray-500">Phone</label><input value={cashierPhone} onChange={(event) => setCashierPhone(event.target.value)} className="mt-1 w-full rounded-lg border border-[#30303d] bg-[#17171f] px-3 py-2 text-sm text-white outline-none" inputMode="tel" placeholder="07XX XXX XXX" /><label className="mt-3 block text-[10px] font-bold uppercase tracking-wider text-gray-500">M-Pesa amount in KES · min 10</label><input value={cashierAmount} onChange={(event) => setCashierAmount(event.target.value)} className="mt-1 w-full rounded-lg border border-[#30303d] bg-[#17171f] px-3 py-2 text-sm text-white outline-none" type="number" min="10" step="1" placeholder="0" /><div className="mt-3 flex gap-1.5">{[100, 250, 500, 1000, 2500].map((amount) => <button key={amount} onClick={() => setCashierAmount(String(amount))} className="rounded-md border border-[#30303d] px-2 py-1 text-[10px] text-gray-400 hover:border-emerald-400 hover:text-emerald-300">KES {amount}</button>)}</div><button disabled={cashierTab !== 'deposit' || isCashierSubmitting} onClick={() => void handleCashierDeposit()} className="mt-4 w-full rounded-lg bg-emerald-500/20 px-3 py-2 text-xs font-bold text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50">{cashierTab === 'deposit' ? (isCashierSubmitting ? 'Sending prompt...' : 'Pay with M-Pesa') : 'Request withdrawal (coming soon)'}</button>{cashierStatus && <p className="mt-3 text-center text-[10px] text-gray-400">{cashierStatus}</p>}</div>}
+            <p className="mt-4 text-center text-[10px] text-gray-600">Powered by Safaricom Daraja</p>
           </section>
         </div>
       )}
