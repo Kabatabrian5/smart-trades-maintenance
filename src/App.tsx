@@ -509,6 +509,20 @@ export default function App() {
   const [scannerProgress, setScannerProgress] = useState(0);
   const { currentTick, marketStatus, digitHistory } = useDerivSocket(selectedSymbol);
 
+  function fireAiScanFromMainScreen() {
+    setSignalMarket(selectedSymbol);
+    setCurrentTab('signal');
+    setAiScannerOpen(true);
+    setScannerProgress(0);
+    const timer = window.setInterval(() => {
+      setScannerProgress((current) => Math.min(current + 16, 100));
+    }, 170);
+    window.setTimeout(() => {
+      window.clearInterval(timer);
+      setScannerProgress(100);
+    }, 850);
+  }
+
   const signalMarketType = marketSymbolToMarketType(signalMarket);
   const signalScan = scanMarket(signalMarketType);
   const recommendedBot = recommendBot(signalMarketType);
@@ -1034,6 +1048,17 @@ export default function App() {
               ) : (
                 <div className="rounded-xl border border-[#262633] bg-[#1b1b24] p-3 text-center text-xs text-gray-400">Choose a direction below to place this contract.</div>
               )}
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  onClick={fireAiScanFromMainScreen}
+                  className="w-full rounded-2xl border border-cyan-400/60 bg-cyan-400/12 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200 transition hover:bg-cyan-300 hover:text-slate-950"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
+                    AI Scanner
+                  </span>
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="rounded-xl border border-[#262633] bg-[#1b1b24] px-2 py-1.5 sm:p-2 text-center text-[9px] sm:text-[10px] uppercase text-gray-500">Ticks
                   <span className="mt-0.5 sm:mt-1 flex items-center justify-between text-sm font-bold text-white"><button type="button" onClick={() => setTicksCount((value) => Math.max(1, value - 1))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">-</button><span>{ticksCount}</span><button type="button" onClick={() => setTicksCount((value) => value + 1)} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">+</button></span>
