@@ -582,6 +582,9 @@ export default function App() {
   // Dashboard & Bot Manager state
   const [dashboardBots, setDashboardBots] = useState<BotItem[]>([]);
   const [selectedBotTemplate, setSelectedBotTemplate] = useState<BotTemplate | null>(null);
+  const [botBuilderLoading, setBotBuilderLoading] = useState(false);
+  const [botBuilderProgress, setBotBuilderProgress] = useState(0);
+  const [botBuilderLastEvent, setBotBuilderLastEvent] = useState('Ready');
 
   // Quick Strategy Modal State
   const [isQuickStrategyOpen, setIsQuickStrategyOpen] = useState(false);
@@ -657,12 +660,35 @@ export default function App() {
     setStake(initialStakeInput);
 
     setIsQuickStrategyOpen(false);
-    setCurrentTab('bot-builder');
+    openBotBuilder({ name: selectedStrategy, id: selectedStrategy, file: `${selectedStrategy.toLowerCase().replace(/\s+/g, '-')}.xml`, description: `${selectedStrategy} strategy`, accent: 'from-emerald-500 to-cyan-500' });
   };
 
-  function loadBotTemplate(template: BotTemplate) {
-    setSelectedBotTemplate(template);
+  function openBotBuilder(template?: BotTemplate) {
+    if (template) {
+      setSelectedBotTemplate(template);
+      setBotBuilderLastEvent(`Loading ${template.name}`);
+    } else {
+      setBotBuilderLastEvent('Loading workspace');
+    }
+
+    setBotBuilderLoading(true);
+    setBotBuilderProgress(8);
     setCurrentTab('bot-builder');
+
+    const timer = window.setInterval(() => {
+      setBotBuilderProgress((current) => Math.min(current + 12, 92));
+    }, 180);
+
+    window.setTimeout(() => {
+      window.clearInterval(timer);
+      setBotBuilderProgress(100);
+      setBotBuilderLoading(false);
+      setBotBuilderLastEvent(template?.name ?? selectedStrategy ?? 'Strategy loaded');
+    }, 900);
+  }
+
+  function loadBotTemplate(template: BotTemplate) {
+    openBotBuilder(template);
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1161,8 +1187,8 @@ export default function App() {
             <div className="flex items-center gap-3">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff444f] text-sm font-black text-white">D</span>
               <div>
-                <p className="text-sm font-extrabold">{selectedBotTemplate?.name ?? 'Deriv Bot Builder'}</p>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">official embedded build</p>
+                <p className="text-sm font-extrabold">{selectedBotTemplate?.name ?? activeStrategyConfig?.strategyName ?? 'Deriv Bot Builder'}</p>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">official embedded build · {botBuilderLastEvent}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -1179,9 +1205,18 @@ export default function App() {
               </button>
             </div>
           </div>
+          {botBuilderLoading && (
+            <div className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-2xl border border-cyan-300/40 bg-[#071a1f] px-5 py-3 shadow-[0_0_30px_rgba(45,212,191,0.25)] text-cyan-100">
+              <div className="flex items-center gap-3">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
+                <span className="text-[11px] font-black uppercase tracking-[0.18em]">Bot runtime loading</span>
+                <span className="text-[11px] font-bold text-cyan-300">{botBuilderProgress}%</span>
+              </div>
+            </div>
+          )}
           <iframe
             title="Deriv Bot Builder"
-            src="/bot-builder/"
+            src={`/bot-builder/?template=${encodeURIComponent(selectedBotTemplate?.file ?? 'deriv-default.xml')}`}
             className="h-full w-full border-0 bg-white"
             allow="clipboard-write"
           />
