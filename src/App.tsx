@@ -3,6 +3,7 @@ import PositionsDrawer from './components/layout/PositionsDrawer';
 import { useDerivSocket } from './hooks/useDerivSocket';
 import { derivService } from './services/derivSocket';
 import { fetchOptionsAccounts, requestAccountWebSocketUrl, pickPrimaryAccount, type DerivOptionsAccount } from './services/derivAccounts';
+import { scanMarket, recommendBot, type MarketType } from './lib/botRegistry';
 
 const VOLATILITY_MARKETS = [
   { id: '1HZ10V', name: 'Volatility 10 (1s) Index' },
@@ -140,6 +141,15 @@ function getAccountType(account: DerivAccount): 'real' | 'demo' {
 
 function toBase64Url(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function marketSymbolToMarketType(symbol: string): MarketType {
+  const normalized = symbol.toUpperCase();
+  if (normalized.includes('1HZ100V') || normalized.includes('R_100')) return 'volatility100';
+  if (normalized.includes('BOOM500') || normalized.includes('BOOM')) return 'boom500';
+  if (normalized.includes('JD75') || normalized.includes('JUMP75') || normalized.includes('JD')) return 'jump75';
+  if (normalized.includes('1HZ50V') || normalized.includes('R_50') || normalized.includes('VOL50')) return 'volatility50';
+  return 'volatility100';
 }
 
 async function derivOAuthUrl() {
@@ -495,7 +505,25 @@ export default function App() {
   const [signalMarket, setSignalMarket] = useState('1HZ100V');
   const [signalDigitStats, setSignalDigitStats] = useState(digitStatsPlaceholder());
   const [isSearchingSignals, setIsSearchingSignals] = useState(false);
+  const [aiScannerOpen, setAiScannerOpen] = useState(false);
+  const [scannerProgress, setScannerProgress] = useState(0);
   const { currentTick, marketStatus, digitHistory } = useDerivSocket(selectedSymbol);
+
+  const signalMarketType = marketSymbolToMarketType(signalMarket);
+  const signalScan = scanMarket(signalMarketType);
+  const recommendedBot = recommendBot(signalMarketType);
+
+  function handleAiScan() {
+    setAiScannerOpen(true);
+    setScannerProgress(0);
+    const timer = window.setInterval(() => {
+      setScannerProgress((current) => Math.min(current + 12, 96));
+    }, 180);
+    window.setTimeout(() => {
+      window.clearInterval(timer);
+      setScannerProgress(100);
+    }, 950);
+  }
 
   function digitStatsPlaceholder() {
     return Array.from({ length: 10 }, (_, digit) => ({ digit, count: 0, pct: 0 }));
@@ -1050,7 +1078,28 @@ export default function App() {
         <main className="relative flex-1 overflow-y-auto bg-[#16161c] p-4 text-white sm:p-8">
           {isSearchingSignals && <div className="signal-cinema" role="status" aria-live="polite"><div className="signal-cinema__scanline" /><div className="signal-cinema__radar" aria-hidden="true"><span /><i /><b /></div><p className="signal-cinema__eyebrow">SIGNAL ENGINE // LIVE SCAN</p><h2>Reading market behavior</h2><p className="signal-cinema__message">Sampling recent ticks, digit frequency, and contract patterns for {signalMarket}.</p><div className="signal-cinema__steps"><span className="signal-cinema__step signal-cinema__step--active">01 HISTORY</span><span className="signal-cinema__step">02 FREQUENCY</span><span className="signal-cinema__step">03 CONTEXT</span></div><div className="signal-cinema__bar"><span /></div></div>}
           <div className="mx-auto max-w-4xl space-y-5">
-            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-400">Digit signal</p><h1 className="mt-1 text-2xl font-extrabold">Hourly signal</h1><p className="mt-2 text-sm text-gray-400">Choose a market to scan the next hour.</p></div><select value={signalMarket} onChange={(event) => { setSignalMarket(event.target.value); playSignalBeep(); }} className="rounded-xl border border-[#30303d] bg-[#1b1b24] px-3 py-2 text-sm font-bold text-white outline-none">{liveMarkets.map((market) => <option key={market.id} value={market.id}>{market.name}</option>)}</select></div>
+            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-400">Digit signal</p><h1 className="mt-1 text-2xl font-extrabold">Hourly signal</h1><p className="mt-2 text-sm text-gray-400">Choose a market to scan the next hour.</p></div><div className="flex items-center gap-2"><button onClick={handleAiScan} className="rounded-xl bg-cyan-400 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-slate-950 shadow-[0_0_25px_rgba(34,211,238,0.2)] transition hover:bg-cyan-300">AI Scanner</button><select value={signalMarket} onChange={(event) => { setSignalMarket(event.target.value); playSignalBeep(); }} className="rounded-xl border border-[#30303d] bg-[#1b1b24] px-3 py-2 text-sm font-bold text-white outline-none">{liveMarkets.map((market) => <option key={market.id} value={market.id}>{market.name}</option>)}</select></div></div>
+            {aiScannerOpen && <section className="rounded-2xl border border-cyan-400/40 bg-[#071a1f] p-4 shadow-[0_0_14px_rgba(45,212,191,0.2)]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-300">AI market scan</p>
+                  <p className="mt-1 text-sm font-bold text-white">{signalScan.marketLabel}</p>
+                </div>
+                <div className="w-40 overflow-hidden rounded-full bg-slate-900">
+                  <div className="h-2 rounded-full bg-cyan-400 transition-all duration-300" style={{ width: `${scannerProgress}%` }} />
+                </div>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border border-[#24313c] bg-[#112530] p-3"><p className="text-[10px] uppercase text-slate-400">AI Confidence</p><p className="mt-1 text-lg font-black text-cyan-300">{signalScan.aiScore.toFixed(2)}%</p></div>
+                <div className="rounded-xl border border-[#24313c] bg-[#112530] p-3"><p className="text-[10px] uppercase text-slate-400">Win Rate</p><p className="mt-1 text-lg font-black text-emerald-300">{signalScan.winRate.toFixed(2)}%</p></div>
+                <div className="rounded-xl border border-[#24313c] bg-[#112530] p-3"><p className="text-[10px] uppercase text-slate-400">Samples</p><p className="mt-1 text-lg font-black text-white">{signalScan.samples}</p></div>
+                <div className="rounded-xl border border-[#24313c] bg-[#112530] p-3"><p className="text-[10px] uppercase text-slate-400">Recommended Bot</p><p className="mt-1 text-sm font-black text-amber-300">{recommendedBot.name}</p></div>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400">status: {scannerProgress >= 100 ? 'complete' : 'scanning'}</span>
+                <button onClick={() => { setCurrentTab('bot-builder'); setAiScannerOpen(false); }} className="rounded-xl bg-teal-400 px-4 py-2 text-[11px] font-black uppercase text-[#071217] hover:bg-teal-300">Load Bot</button>
+              </div>
+            </section>}
             <div className="overflow-hidden rounded-2xl border border-cyan-500/30 bg-[#08131c] p-5"><div className="flex items-center gap-4"><div className="relative grid h-14 w-14 place-items-center rounded-xl border border-cyan-400/50 bg-cyan-400/10 text-2xl shadow-[0_0_25px_rgba(34,211,238,0.25)]"><span className="animate-pulse">◉</span><span className="absolute inset-0 animate-ping rounded-xl border border-cyan-400/40" /></div><div><p className="font-mono text-sm font-bold text-cyan-300">SIGNAL ENGINE // {isSearchingSignals ? 'SEARCHING...' : 'SCAN COMPLETE'}</p><p className="mt-1 text-xs text-slate-400">{isSearchingSignals ? `Scanning ${signalMarket} patterns and digit frequencies` : `Hourly scan ready for ${signalMarket}`}</p></div></div><div className="mt-4 h-1 overflow-hidden rounded-full bg-slate-800"><div className={`h-full bg-cyan-400 transition-all duration-700 ${isSearchingSignals ? 'w-2/3 animate-pulse' : 'w-full'}`} /></div></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#262633] bg-[#1b1b24] p-5"><p className="text-xs uppercase text-gray-500">Even / Odd</p><p className="mt-2 text-lg font-extrabold text-teal-400">{analysisStats.filter((item) => item.digit % 2 === 0).reduce((sum, item) => sum + item.pct, 0)}% Even</p><p className="text-sm text-gray-400">{analysisStats.filter((item) => item.digit % 2 !== 0).reduce((sum, item) => sum + item.pct, 0)}% Odd</p><p className="mt-3 text-xs text-gray-500">Suggested side: {analysisStats.filter((item) => item.digit % 2 === 0).reduce((sum, item) => sum + item.count, 0) >= analysisStats.filter((item) => item.digit % 2 !== 0).reduce((sum, item) => sum + item.count, 0) ? 'Even' : 'Odd'}</p></div>
