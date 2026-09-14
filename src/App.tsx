@@ -70,6 +70,13 @@ const BOT_TEMPLATES: BotTemplate[] = [
   { id: 'rise-fall-pro', name: 'Rise Fall Pro', file: 'rise-fall-pro.xml', description: 'Smart automated trading strategy', accent: 'from-violet-500 to-fuchsia-500' },
 ];
 
+const TEMPLATE_RECOMMENDATION_BY_MARKET: Record<MarketType, BotTemplate['id']> = {
+  volatility100: 'accumulators-pro',
+  boom500: 'over-under-pro',
+  jump75: 'rise-fall-pro',
+  volatility50: 'only-ups-down-pro',
+};
+
 interface DerivAccount {
   loginid: string;
   token: string;
@@ -525,6 +532,7 @@ export default function App() {
 
   const signalMarketType = marketSymbolToMarketType(signalMarket);
   const signalScan = scanMarket(signalMarketType);
+  const recommendedTemplate = BOT_TEMPLATES.find((template) => template.id === TEMPLATE_RECOMMENDATION_BY_MARKET[signalMarketType]) ?? BOT_TEMPLATES[0];
   const recommendedBot = recommendBot(signalMarketType);
 
   function handleAiScan() {
@@ -1148,7 +1156,7 @@ export default function App() {
               </div>
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-400">status: {scannerProgress >= 100 ? 'complete' : 'scanning'}</span>
-                <button onClick={() => { setCurrentTab('bot-builder'); setAiScannerOpen(false); }} className="rounded-xl bg-teal-400 px-4 py-2 text-[11px] font-black uppercase text-[#071217] hover:bg-teal-300">Load Bot</button>
+                <button onClick={() => { setSelectedBotTemplate(recommendedTemplate); setCurrentTab('bot-builder'); setAiScannerOpen(false); loadBotTemplate(recommendedTemplate); }} className="rounded-xl bg-teal-400 px-4 py-2 text-[11px] font-black uppercase text-[#071217] hover:bg-teal-300">Load Bot</button>
               </div>
             </section>}
             <div className="overflow-hidden rounded-2xl border border-cyan-500/30 bg-[#08131c] p-5"><div className="flex items-center gap-4"><div className="relative grid h-14 w-14 place-items-center rounded-xl border border-cyan-400/50 bg-cyan-400/10 text-2xl shadow-[0_0_25px_rgba(34,211,238,0.25)]"><span className="animate-pulse">◉</span><span className="absolute inset-0 animate-ping rounded-xl border border-cyan-400/40" /></div><div><p className="font-mono text-sm font-bold text-cyan-300">SIGNAL ENGINE // {isSearchingSignals ? 'SEARCHING...' : 'SCAN COMPLETE'}</p><p className="mt-1 text-xs text-slate-400">{isSearchingSignals ? `Scanning ${signalMarket} patterns and digit frequencies` : `Hourly scan ready for ${signalMarket}`}</p></div></div><div className="mt-4 h-1 overflow-hidden rounded-full bg-slate-800"><div className={`h-full bg-cyan-400 transition-all duration-700 ${isSearchingSignals ? 'w-2/3 animate-pulse' : 'w-full'}`} /></div></div>
@@ -1216,7 +1224,7 @@ export default function App() {
           )}
           <iframe
             title="Deriv Bot Builder"
-            src={`/bot-builder/?template=${encodeURIComponent(selectedBotTemplate?.file ?? 'deriv-default.xml')}`}
+            src={`/bot-builder/index.html?template=${encodeURIComponent(selectedBotTemplate?.file ?? 'deriv-default.xml')}`}
             className="h-full w-full border-0 bg-white"
             allow="clipboard-write"
           />
