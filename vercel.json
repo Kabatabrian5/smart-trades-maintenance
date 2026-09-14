@@ -5,11 +5,7 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/bot-builder/:path*",
-      "destination": "/bot-builder/:path*"
-    },
-    {
-      "source": "/((?!bot-builder|assets|static|sw\.js|offline\.html).*)",
+      "source": "/((?!bot-builder|assets|static).*)",
       "destination": "/index.html"
     }
   ]
