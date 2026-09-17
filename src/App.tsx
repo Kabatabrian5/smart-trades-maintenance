@@ -503,6 +503,12 @@ export default function App() {
   const [selectedDigit, setSelectedDigit] = useState<number>(3);
   const [tradeMode, setTradeMode] = useState<TradeMode>('MATCHES_DIFFERS');
   const [stake, setStake] = useState(10);
+  const [executionMode, setExecutionMode] = useState<'single' | 'multiple'>('single');
+  const [takeProfitEnabled, setTakeProfitEnabled] = useState(true);
+  const [stopLossEnabled, setStopLossEnabled] = useState(true);
+  const [takeProfitTarget, setTakeProfitTarget] = useState(30);
+  const [stopLossLimit, setStopLossLimit] = useState(-20);
+  const [maxTradesPerCycle, setMaxTradesPerCycle] = useState(4);
   const [proposalPayouts, setProposalPayouts] = useState<Record<string, number | null>>({});
   const [ticksCount, setTicksCount] = useState(1);
   const [positions, setPositions] = useState<Position[]>(() => {
@@ -699,6 +705,19 @@ export default function App() {
     openBotBuilder(template);
   }
 
+  function launchFloatingAiScan() {
+    setCurrentTab('signal');
+    setAiScannerOpen(true);
+    setScannerProgress(0);
+    const timer = window.setInterval(() => {
+      setScannerProgress((current) => Math.min(current + 12, 96));
+    }, 160);
+    window.setTimeout(() => {
+      window.clearInterval(timer);
+      setScannerProgress(100);
+    }, 950);
+  }
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -785,23 +804,34 @@ export default function App() {
     setDashboardBots((prev) => [duplicated, ...prev]);
   };
 
-  const handlePurchase = async (contractType: string) => {
-    try {
-      const tradeStake = Math.max(0.35, stake);
-      const needsBarrier = ['DIGITMATCH', 'DIGITDIFF', 'DIGITOVER', 'DIGITUNDER', 'ONETOUCH', 'NOTOUCH'].includes(contractType);
-      const proposalRes = await derivService.send({
-        proposal: 1,
-        amount: tradeStake,
-        basis: 'stake',
-        currency: 'USD',
-        underlying_symbol: selectedSymbol,
-        contract_type: contractType,
-        duration: ticksCount,
-        duration_unit: 't',
-        ...(needsBarrier ? { barrier: selectedDigit.toString() } : {}),
-      });
+  function resolvePositionProfit(rawProfit: number | null | undefined, payout: number, buyPrice: number): number {
+    const fallback = payout > 0 ? payout - buyPrice : 0;
+    const safeProfit = rawProfit ?? fallback;
+    if (safeProfit === 0) return 0;
+    return safeProfit < 0 ? -Math.abs(safeProfit) : Math.abs(safeProfit);
+  }
 
-      if (proposalRes.proposal) {
+  const handlePurchase = async (contractType: string) => {
+    const cycleTrades = executionMode === 'multiple' ? Math.max(1, maxTradesPerCycle) : 1;
+
+    try {
+      for (let tradeIndex = 0; tradeIndex < cycleTrades; tradeIndex += 1) {
+        const tradeStake = Math.max(0.35, stake);
+        const needsBarrier = ['DIGITMATCH', 'DIGITDIFF', 'DIGITOVER', 'DIGITUNDER', 'ONETOUCH', 'NOTOUCH'].includes(contractType);
+        const proposalRes = await derivService.send({
+          proposal: 1,
+          amount: tradeStake,
+          basis: 'stake',
+          currency: 'USD',
+          underlying_symbol: selectedSymbol,
+          contract_type: contractType,
+          duration: ticksCount,
+          duration_unit: 't',
+          ...(needsBarrier ? { barrier: selectedDigit.toString() } : {}),
+        });
+
+        if (!proposalRes.proposal) break;
+
         const buyRes = await derivService.buyContract(proposalRes.proposal.id, proposalRes.proposal.ask_price);
         const recordedPosition: Position = {
           id: String(buyRes.buy.contract_id),
@@ -819,9 +849,11 @@ export default function App() {
         });
         await derivService.subscribeToContract(String(buyRes.buy.contract_id));
         await derivService.refreshBalance();
-        setCurrentTab('positions');
-      }
 
+        if (takeProfitEnabled && totalProfitLoss >= takeProfitTarget) break;
+        if (stopLossEnabled && totalProfitLoss <= stopLossLimit) break;
+      }
+      setCurrentTab('positions');
     } catch (error: any) {
       alert(`Trade failed: ${error.message || 'Unknown error'}`);
     }
@@ -853,9 +885,10 @@ export default function App() {
       const contractValue = normalizeBalance(contract.bid_price);
       const payout = normalizeBalance(contract.payout) ?? 0;
       const buyPrice = normalizeBalance(contract.buy_price) ?? 0;
-      const profit = normalizeBalance(contract.profit) ?? payout - buyPrice;
+      const rawProfit = normalizeBalance(contract.profit);
+      const adjustedProfit = resolvePositionProfit(rawProfit, payout, buyPrice);
       const settled = Boolean(contract.is_sold) || contract.status === 'sold';
-      const result: 'won' | 'lost' = profit >= 0 ? 'won' : 'lost';
+      const result: 'won' | 'lost' = adjustedProfit >= 0 ? 'won' : 'lost';
 
       setPositions((current) => {
         const updatedPositions = current.map((position) => position.id === contractId
@@ -865,7 +898,7 @@ export default function App() {
               ...(lastDigit === undefined ? {} : { lastDigit }),
               ...(contractValue === null ? {} : { contractValue }),
               payout,
-              profit,
+              profit: adjustedProfit,
               ...(settled ? { status: 'Settled' as const, result } : {}),
             }
           : position);
@@ -933,6 +966,13 @@ export default function App() {
   const totalStake = positions.reduce((total, position) => total + position.stake, 0);
   const totalPayout = settledPositions.reduce((total, position) => total + (position.payout ?? 0), 0);
   const totalProfitLoss = settledPositions.reduce((total, position) => total + (position.profit ?? 0), 0);
+  const autoStopStatus = (() => {
+    const localProfit = totalProfitLoss;
+    if (takeProfitEnabled && localProfit >= takeProfitTarget) return `TP reached: ${takeProfitTarget} USD`;
+    if (stopLossEnabled && localProfit <= stopLossLimit) return `SL reached: ${stopLossLimit} USD`;
+    if (executionMode === 'multiple') return `Cycle active: up to ${maxTradesPerCycle} trades`;
+    return 'Single-trade mode';
+  })();
   const contractsLost = settledPositions.filter((position) => position.result === 'lost').length;
   const contractsWon = settledPositions.filter((position) => position.result === 'won').length;
   const journalDay = new Date();
@@ -1073,6 +1113,38 @@ export default function App() {
                 </select>
                 {isDigitMode && <span className="text-teal-400 font-mono">Barrier: {selectedDigit}</span>}
               </div>
+
+              <div className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2.5">
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-gray-400">
+                  <span>Execution</span>
+                  <span className="font-bold text-teal-300">{executionMode === 'single' ? 'Single' : 'Cycle'}</span>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] font-bold">
+                  <button type="button" onClick={() => setExecutionMode('single')} className={`rounded-lg px-2 py-2 ${executionMode === 'single' ? 'bg-teal-500 text-black' : 'bg-[#252533] text-gray-300'}`}>One at a time</button>
+                  <button type="button" onClick={() => setExecutionMode('multiple')} className={`rounded-lg px-2 py-2 ${executionMode === 'multiple' ? 'bg-cyan-500 text-black' : 'bg-[#252533] text-gray-300'}`}>Multi trade</button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-gray-300">
+                  <label className="rounded-lg border border-[#30313d] bg-[#151821] p-2">
+                    <span className="flex items-center justify-between">
+                      <span>TP</span>
+                      <input type="checkbox" checked={takeProfitEnabled} onChange={(event) => setTakeProfitEnabled(event.target.checked)} className="accent-teal-400" />
+                    </span>
+                    <input type="number" value={takeProfitTarget} onChange={(event) => setTakeProfitTarget(Number(event.target.value) || 0)} className="mt-2 w-full bg-transparent text-sm font-bold text-white outline-none" />
+                  </label>
+                  <label className="rounded-lg border border-[#30313d] bg-[#151821] p-2">
+                    <span className="flex items-center justify-between">
+                      <span>SL</span>
+                      <input type="checkbox" checked={stopLossEnabled} onChange={(event) => setStopLossEnabled(event.target.checked)} className="accent-rose-400" />
+                    </span>
+                    <input type="number" value={Math.abs(stopLossLimit)} onChange={(event) => setStopLossLimit(-(Number(event.target.value) || 0))} className="mt-2 w-full bg-transparent text-sm font-bold text-white outline-none" />
+                  </label>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-[#30313d] bg-[#151821] p-2 text-[10px] text-gray-400">
+                  <span>Cycle max</span>
+                  <input type="number" min="1" max="10" value={maxTradesPerCycle} onChange={(event) => setMaxTradesPerCycle(Math.min(10, Math.max(1, Number(event.target.value) || 1)))} className="w-12 bg-transparent text-right text-sm font-bold text-white outline-none" />
+                </div>
+              </div>
+
               {isDigitMode ? (
                 <div className="grid grid-cols-5 gap-1 sm:gap-1.5 bg-[#1b1b24] p-1.5 sm:p-2 rounded-xl border border-[#262633]">
                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
@@ -1101,6 +1173,9 @@ export default function App() {
                   <span className="mt-0.5 sm:mt-1 flex items-center justify-between text-sm font-bold text-white"><button type="button" onClick={() => setStake((value) => Math.max(0.35, Number((value - 0.01).toFixed(2))))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">-</button><input type="number" min="0.35" step="0.01" value={stake || ''} onChange={(event) => setStake(event.target.value === '' ? 0 : Number(event.target.value))} onBlur={() => setStake((value) => Math.max(0.35, value || 0.35))} className="min-w-0 w-full bg-transparent text-center text-sm font-bold text-white outline-none" /><button type="button" onClick={() => setStake((value) => Number((Math.max(0.35, value) + 0.01).toFixed(2)))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">+</button></span>
                 </label>
               </div>
+            </div>
+            <div className="rounded-xl border border-[#22222c] bg-[#17171f] px-3 py-2 text-[10px] font-bold text-gray-300">
+              <span className="text-gray-500">Auto-stop:</span> {autoStopStatus}
             </div>
             <div className="grid grid-cols-2 gap-3 pt-3 sm:pt-4 border-t border-[#22222c]">
               {tradeButtons.map((button, index) => <button key={button.type} onClick={() => handlePurchase(button.type)} className={`py-2 px-2 rounded-xl text-center font-bold cursor-pointer ${index === 0 ? 'bg-teal-500 text-black' : 'bg-rose-600 text-white'}`}><span className="block">{button.label}</span><span className="mt-1 block text-[10px] font-semibold opacity-80">Payout: {proposalPayouts[button.type] === null || proposalPayouts[button.type] === undefined ? '--' : `${proposalPayouts[button.type]?.toFixed(2)} USD`}</span></button>)}
@@ -1227,6 +1302,11 @@ export default function App() {
             src={`/bot-builder/index.html?template=${encodeURIComponent(selectedBotTemplate?.file ?? 'deriv-default.xml')}`}
             className="h-full w-full border-0 bg-white"
             allow="clipboard-write"
+            onLoad={() => {
+              setBotBuilderLoading(false);
+              setBotBuilderProgress(100);
+              setBotBuilderLastEvent(selectedBotTemplate?.name ?? activeStrategyConfig?.strategyName ?? 'Builder ready');
+            }}
           />
         </div>
       )}
@@ -1419,6 +1499,16 @@ export default function App() {
           </div>
         </div>
       )}
+      <button
+        type="button"
+        className="floating-ai-scan fixed bottom-8 right-8 z-50 flex h-16 w-16 items-center justify-center rounded-full border border-cyan-300 bg-[#071a1f] text-cyan-100 shadow-[0_0_30px_rgba(45,212,191,0.45)] transition hover:scale-105 hover:bg-cyan-400 hover:text-slate-950"
+        onClick={launchFloatingAiScan}
+        aria-label="Launch AI scanner"
+      >
+        <span className="floating-ai-scan__halo" />
+        <span className="floating-ai-scan__icon">✦</span>
+      </button>
+
       {authStatus === 'failed' && <div className="fixed bottom-16 left-1/2 z-40 max-w-[min(90vw,32rem)] -translate-x-1/2 rounded-xl border border-rose-500/40 bg-[#29151b] px-4 py-3 text-xs text-rose-200 shadow-xl">Deriv login could not be completed: {authError || 'Please try again.'}</div>}
       {authStatus === 'authorizing' && (
         <div className="auth-cinema fixed inset-0 z-[70] overflow-hidden bg-[#05080d]" role="status" aria-live="polite">

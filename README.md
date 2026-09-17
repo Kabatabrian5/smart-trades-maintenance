@@ -1,114 +1,108 @@
-# React + TypeScript + Vite
+# SmartTrades Maintenance
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SmartTrades is a Vite + React + TypeScript trading dashboard for Deriv markets, designed around an AI-assisted market scanner, manual trading controls, live position monitoring, and bot-template recommendations.
 
-Currently, two official plugins are available:
+This repository is the live maintenance branch for the SmartTrades product currently deployed at https://smart-trades.site.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Product direction
 
-## React Compiler
+The current app is focused on a hybrid trading workflow:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- AI market scanning and recommendations for Deriv synthetic indices
+- Manual trade execution with clear control panels and live market feedback
+- Position tracking and settlement updates from Deriv WebSocket events
+- Bot template suggestions mapped to the visible strategy library
+- A public static bot-builder route for templated strategy loading
 
-## Expanding the ESLint configuration
+The immediate priority is now manual trading perfection before further bot-builder expansion.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Tech stack
 
-```js
-export default defineConfig([
-  # Smartest Trades
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- Deriv OAuth / WebSocket integrations
+- Session persistence in the browser
 
-  Production web trading client for Deriv Options.
+## Repository and deployment
 
-  ## Repositories and deployment
+- GitHub: https://github.com/Kabatabrian5/smart-trades-maintenance
+- Production site: https://smart-trades.site
+- Local working directory: C:\Users\hp\smart-trades-maintenance
+- Default deploy branch: main
 
-  - GitHub: https://github.com/Kabatabrian5/smart-trades-maintenance
-  - Production: https://smart-trades.site
-  - Local path: `C:\projects\smart-trades`
-  - Deployment: Vercel follows `main` automatically.
+## Local setup
 
-  ## Run locally
+```powershell
+cd C:\Users\hp\smart-trades-maintenance
+npm install
+npm run dev -- --host 0.0.0.0
+```
 
-  ```powershell
-  Set-Location "C:\projects\smart-trades"
-  npm install
-  npm run dev -- --host 0.0.0.0
-  ```
+Validate a change with:
 
-  Validate a change:
+```powershell
+cd C:\Users\hp\smart-trades-maintenance
+npm run build
+```
 
-  ```powershell
-  npm run build
-  ```
+## Current app status
 
-  The production build is the reliable validation command. `npm run lint` currently reports older repository-wide issues in `App.tsx` and `useDerivSocket.ts`; do not treat those unrelated findings as a reason to undo working changes.
+The repo is synced to the live GitHub remote and the working branch is aligned with `origin/main`.
 
-  ## Current trading behavior
+Highlights in the current product flow:
 
-  - OAuth 2.0 PKCE login uses the modern Deriv OIDC flow.
-  - Account discovery and authenticated WebSocket URLs use `api.derivws.com` REST/OTP endpoints.
-  - Manual proposals use `underlying_symbol`, not the retired `symbol` proposal field.
-  - A successful trade is recorded only after Deriv returns a real buy response.
-  - After every successful buy, the app opens the Positions section automatically.
-  - Positions react to `proposal_open_contract` updates with tick progress, live P/L, contract value, payout, and final win/loss status.
-  - The balance is refreshed after buy and after settlement.
-  - Real/demo switching requests a fresh OTP WebSocket connection for the selected account.
-  - Positions are persisted in browser session storage under `smart-trades-positions`.
+- AI scanner flow exists and recommends a template based on the selected market
+- Floating AI scan trigger is available from the main trading screen
+- Manual trading flow is the current priority for tighter P/L math and trade-loop quality
+- Public static bot-builder assets are separated from the SPA router to avoid route conflicts
+- Positions and settlement updates are wired to real Deriv contract events
+- Balance refresh and market/account switching continue to be refined
 
-  ## Important files
+## Core files
 
-  - `src/App.tsx`: application state, OAuth, account switching, cashier, trade placement, and Positions page.
-  - `src/services/derivAccounts.ts`: modern account discovery and OTP requests.
-  - `src/services/derivSocket.ts`: WebSocket transport, buy, balance, and contract subscriptions.
-  - `src/components/layout/PositionsDrawer.tsx`: desktop reactive Positions drawer.
-  - `api/deriv-token.ts`: server-side OAuth code exchange.
-  - `api/deripay-deposit.ts`: server-side deposit request signing and forwarding.
-  - `api/deripay-status.ts`: payment status proxy.
-  - `PROJECT_HANDOFF.md`: detailed architecture and outstanding work.
+- `src/App.tsx` – main trading UI, scanner flow, manual trade controls, positions, dashboard, and app routing
+- `src/lib/botRegistry.ts` – market scanning and template recommendation engine
+- `src/services/derivAccounts.ts` – Deriv account discovery and OTP request logic
+- `src/services/derivSocket.ts` – Deriv WebSocket connection and trade data flow
+- `src/components/layout/PositionsDrawer.tsx` – live positions drawer and settlement handling
+- `public/bot-builder/index.html` – static public builder route used by the embedded template launcher
+- `vercel.json` – deployment rewrite config and route exclusions
 
-  ## Environment variables
+## Environment variables
 
-  Frontend:
+Frontend environment variables used by the app:
 
-  ```text
-  VITE_DERIV_CLIENT_ID
-  VITE_GOOGLE_CLIENT_ID
-  VITE_GOOGLE_API_KEY
-  ```
+```text
+VITE_DERIV_CLIENT_ID
+VITE_GOOGLE_CLIENT_ID
+VITE_GOOGLE_API_KEY
+```
 
-  Server-only Vercel variables:
+Server-side variables for API functions:
 
-  ```text
-  DERIV_CLIENT_ID
-  DERIV_APP_ID          # separate numeric legacy ID for DeriPay only
-  DERIV_CLIENT_SECRET
-  DERIPAY_API_KEY
-  ```
+```text
+DERIV_CLIENT_ID
+DERIV_APP_ID
+DERIV_CLIENT_SECRET
+DERIPAY_API_KEY
+```
 
-  Never expose DeriPay keys, Deriv secrets, or user tokens in `VITE_` variables or committed files. The modern OAuth client ID is alphanumeric and must not be used as DeriPay's numeric `appId`.
+Do not commit secrets or expose sensitive values in client-side environment variables.
 
-  ## Latest deployment
+## Current project focus
 
-  Latest pushed commit: `081c795 Open reactive positions after trades`.
+The next implementation passes are centered on manual trading quality:
 
-  Recent fixes include the modern proposal field (`fda746c`), real/demo switching (`d8f2bdc`), and reactive Positions navigation and settlement display (`081c795`).
+1. Improve TP/SL automation and multi-cycle trade handling
+2. Tighten one-trade-at-a-time versus looped execution modes
+3. Fix P/L math so losing trades reduce net performance correctly
+4. Improve mobile journal readability and chart interpretation
+5. Keep the bot-builder work separate until the manual experience is fully refined
 
-  ## Next work
+## Notes
 
-  1. Verify the reactive Positions flow on production with demo and real accounts.
-  2. Confirm modern OIDC token compatibility with DeriPay before enabling live deposits.
-  3. Finish DeriPay transaction polling/webhooks and withdrawal verification.
-  4. Reconcile live balance/account identity behavior across account switches.
-  5. Add focused tests for proposal payloads, settlement updates, and account switching.
-
-  ## Cashier status
-
-  The Cashier UI and payment endpoints are currently paused and hidden from users while the funding architecture is being verified.
-
-  - DeriPay requires a compatible numeric Deriv App ID bound to its API key and a Deriv token with the `payments` scope. The current modern OAuth client ID has not been confirmed compatible.
-  - pawaPay provides documented mobile-money APIs, but its documented Kenya `MPESA_KEN` configuration is payouts-only for the current account; Kenya deposits are not confirmed.
-  - No payment should be treated as a Deriv credit until the payment provider, Deriv Payment Agent authorization, webhook reconciliation, and durable transaction storage are verified.
-  - Daraja sandbox code remains available for investigation but is not a production funding path. The sandbox shortcode `174379` must never be used for live payments.
-
-  Do not enable the Cashier again until one provider confirms Kenya deposits and the Deriv settlement path is tested end to end.
+- The repo is intentionally kept aligned to the live GitHub state before shipping UI changes.
+- Build validation is the default proof step for safe changes.
+- The project is currently being optimized around product usability and manual trading accuracy rather than isolated builder experimentation.
