@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import PositionsDrawer from './components/layout/PositionsDrawer';
 import { useDerivSocket } from './hooks/useDerivSocket';
 import { derivService } from './services/derivSocket';
@@ -107,16 +107,6 @@ interface Position {
   result?: 'won' | 'lost';
 }
 
-interface CashierTransaction {
-  id: string;
-  type: 'deposit' | 'withdraw';
-  amount: number;
-  currency: string;
-  phone: string;
-  status: 'pending' | 'completed' | 'failed';
-  createdAt: number;
-}
-
 type TradeMode = 'MATCHES_DIFFERS' | 'EVEN_ODD' | 'OVER_UNDER' | 'RISE_FALL' | 'HIGHER_LOWER' | 'TOUCH_NO_TOUCH';
 
 const TRADE_MODES: Array<{ id: TradeMode; label: string }> = [
@@ -132,6 +122,8 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undef
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
 
 const DERIV_CLIENT_ID = import.meta.env.VITE_DERIV_CLIENT_ID || '34bIcDF1RsEKSAbKFKimH';
+const DERIV_DEPOSIT_URL = 'https://home.deriv.com/dashboard/deposit?from=home&depositSheet=1&returnTo=%2Fhome&currency=USD';
+const DERIV_WITHDRAW_URL = 'https://home.deriv.com/dashboard/withdraw/verify?currency=USD&from=more';
 
 function normalizeBalance(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -219,18 +211,10 @@ function playTradeSound(result: 'won' | 'lost') {
 export default function App() {
   const [isBooting, setIsBooting] = useState(true);
   const [isLightTheme, setIsLightTheme] = useState(false);
-  const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots'>('manual-trading');
+  const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots' | 'copy-trading'>('manual-trading');
   const [isCashierOpen, setIsCashierOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const [cashierTab, setCashierTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
-  const [cashierPhone, setCashierPhone] = useState('');
-  const [cashierAmount, setCashierAmount] = useState('');
-  const [cashierStatus, setCashierStatus] = useState('');
-  const [isCashierSubmitting, setIsCashierSubmitting] = useState(false);
-  const [cashierTransactions, setCashierTransactions] = useState<CashierTransaction[]>(() => {
-    const saved = sessionStorage.getItem('smart-trades-transactions');
-    return saved ? JSON.parse(saved) as CashierTransaction[] : [];
-  });
+  const [cashierTab, setCashierTab] = useState<'deposit' | 'withdraw'>('deposit');
   const [availableAccounts, setAvailableAccounts] = useState<DerivOptionsAccount[]>([]);
   const [account, setAccount] = useState<DerivAccount | null>(() => {
     const savedAccount = sessionStorage.getItem('smart-trades-account');
@@ -317,7 +301,7 @@ export default function App() {
   // Deriv's current Options API: an OIDC access token doesn't authenticate a WebSocket
   // connection directly. Instead we list the user's accounts, mint a one-time-password
   // WebSocket URL for the chosen account, and connect straight to that (no `authorize`
-  // message needed — the OTP in the URL does it).
+  // message needed â€” the OTP in the URL does it).
   async function authorizeWithAccessToken(accessToken: string) {
     const accounts = await fetchOptionsAccounts(accessToken, DERIV_CLIENT_ID);
     const primary = pickPrimaryAccount(accounts);
@@ -371,39 +355,6 @@ export default function App() {
     }
   }
 
-  async function handleCashierDeposit() {
-    if (!account || isCashierSubmitting) return;
-    setIsCashierSubmitting(true);
-    setCashierStatus('Sending M-Pesa prompt...');
-    try {
-      const phoneNumber = cashierPhone.replace(/\D/g, '').replace(/^0/, '254');
-      const depositResponse = await fetch('/api/pawapay-deposit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber, kesAmount: cashierAmount, accountId: account.loginid }),
-      });
-      const payload = await depositResponse.json().catch(() => ({})) as { message?: string; error?: string; depositId?: string };
-      if (!depositResponse.ok) throw new Error(payload.error || 'Deposit request failed');
-      setCashierStatus(payload.message || 'M-Pesa prompt sent. Complete it on your phone.');
-      if (payload.depositId) {
-        addTransaction({
-          id: payload.depositId,
-          type: 'deposit',
-          amount: Number(cashierAmount) || 0,
-          currency: 'KES',
-          phone: phoneNumber,
-          status: 'pending',
-          createdAt: Date.now(),
-        });
-        pollTransactionStatus(payload.depositId);
-      }
-    } catch (error) {
-      setCashierStatus(error instanceof Error ? error.message : 'Deposit request failed');
-    } finally {
-      setIsCashierSubmitting(false);
-    }
-  }
-
   function handleLogout() {
     sessionStorage.removeItem('smart-trades-account');
     sessionStorage.removeItem('deriv_pkce_verifier');
@@ -416,48 +367,6 @@ export default function App() {
     setAuthError('');
     setIsAccountMenuOpen(false);
     setIsCashierOpen(false);
-  }
-
-  function addTransaction(transaction: CashierTransaction) {
-    setCashierTransactions((current) => {
-      const next = [transaction, ...current];
-      sessionStorage.setItem('smart-trades-transactions', JSON.stringify(next));
-      return next;
-    });
-  }
-
-  function updateTransactionStatus(id: string, status: CashierTransaction['status']) {
-    setCashierTransactions((current) => {
-      const next = current.map((tx) => (tx.id === id ? { ...tx, status } : tx));
-      sessionStorage.setItem('smart-trades-transactions', JSON.stringify(next));
-      return next;
-    });
-  }
-
-  function pollTransactionStatus(transactionId: string, attempt = 0) {
-    const maxAttempts = 20; // roughly 2.5 minutes at 8s intervals
-    if (attempt >= maxAttempts) return;
-    setTimeout(async () => {
-      try {
-        const statusResponse = await fetch(`/api/pawapay-status?depositId=${encodeURIComponent(transactionId)}`);
-        const statusPayload = await statusResponse.json().catch(() => ({})) as { status?: string; error?: string };
-        if (!statusResponse.ok) throw new Error(statusPayload.error || 'Status check failed');
-        const normalizedStatus = (statusPayload.status || '').toLowerCase();
-        if (['completed', 'success', 'successful'].includes(normalizedStatus)) {
-          updateTransactionStatus(transactionId, 'completed');
-          setCashierStatus('M-Pesa payment confirmed. Deriv crediting is not connected yet.');
-          return;
-        }
-        if (['failed', 'cancelled', 'canceled'].includes(normalizedStatus)) {
-          updateTransactionStatus(transactionId, 'failed');
-          setCashierStatus('Deposit failed or was cancelled.');
-          return;
-        }
-        pollTransactionStatus(transactionId, attempt + 1);
-      } catch {
-        pollTransactionStatus(transactionId, attempt + 1);
-      }
-    }, 8000);
   }
 
   useEffect(() => {
@@ -487,11 +396,12 @@ export default function App() {
     { id: 'signal' as const, label: 'Signal' },
     { id: 'dashboard' as const, label: 'Dashboard' },
     { id: 'bot-builder' as const, label: 'Bot Builder' },
+    { id: 'copy-trading' as const, label: 'Copy trading' },
     { id: 'bots' as const, label: 'Bots' },
-  ];
+  ] as const;
 
   const handleNavigation = (id: (typeof navigationItems)[number]['id']) => {
-    if (id === 'manual-trading' || id === 'positions' || id === 'signal' || id === 'dashboard' || id === 'bot-builder' || id === 'bots') {
+    if (id === 'manual-trading' || id === 'positions' || id === 'signal' || id === 'dashboard' || id === 'bot-builder' || id === 'copy-trading' || id === 'bots') {
       setCurrentTab(id);
       return;
     }
@@ -521,20 +431,6 @@ export default function App() {
   const [aiScannerOpen, setAiScannerOpen] = useState(false);
   const [scannerProgress, setScannerProgress] = useState(0);
   const { currentTick, marketStatus, digitHistory } = useDerivSocket(selectedSymbol);
-
-  function fireAiScanFromMainScreen() {
-    setSignalMarket(selectedSymbol);
-    setCurrentTab('signal');
-    setAiScannerOpen(true);
-    setScannerProgress(0);
-    const timer = window.setInterval(() => {
-      setScannerProgress((current) => Math.min(current + 16, 100));
-    }, 170);
-    window.setTimeout(() => {
-      window.clearInterval(timer);
-      setScannerProgress(100);
-    }, 850);
-  }
 
   const signalMarketType = marketSymbolToMarketType(signalMarket);
   const signalScan = scanMarket(signalMarketType);
@@ -599,6 +495,7 @@ export default function App() {
   const [botBuilderLoading, setBotBuilderLoading] = useState(false);
   const [botBuilderProgress, setBotBuilderProgress] = useState(0);
   const [botBuilderLastEvent, setBotBuilderLastEvent] = useState('Ready');
+  const [isBotBuilderRunning, setIsBotBuilderRunning] = useState(false);
 
   // Quick Strategy Modal State
   const [isQuickStrategyOpen, setIsQuickStrategyOpen] = useState(false);
@@ -859,6 +756,26 @@ export default function App() {
     }
   };
 
+  const runLoadedBot = async () => {
+    if (!account) {
+      setAuthError('Log in to Deriv before running a bot.');
+      setAuthStatus('failed');
+      return;
+    }
+
+    setIsBotBuilderRunning(true);
+    setBotBuilderLastEvent(`Running ${selectedBotTemplate?.name ?? activeStrategyConfig?.strategyName ?? 'strategy'}...`);
+
+    try {
+      await handlePurchase(selectedBotTemplate ? 'DIGITMATCH' : 'CALL');
+      setBotBuilderLastEvent(`${selectedBotTemplate?.name ?? activeStrategyConfig?.strategyName ?? 'Strategy'} is live and executing.`);
+    } catch (error) {
+      setBotBuilderLastEvent(error instanceof Error ? error.message : 'Bot runtime failed');
+    } finally {
+      setIsBotBuilderRunning(false);
+    }
+  };
+
   useEffect(() => {
     if (!account) return;
 
@@ -1013,18 +930,17 @@ export default function App() {
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
-          <button onClick={() => setIsLightTheme((theme) => !theme)} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">{isLightTheme ? '🌙' : '☀️'} <span className="hidden sm:inline">{isLightTheme ? 'Dark' : 'Light'}</span></button>
-          {account ? <div className="relative"><button title={`${activeAccountType === 'real' ? 'Real' : 'Demo'} account ${account.loginid}`} onClick={() => setIsAccountMenuOpen((open) => !open)} className="max-w-[126px] truncate rounded-xl border border-emerald-500/30 px-2 py-2 text-[10px] font-bold text-emerald-300 sm:max-w-none sm:px-3 sm:text-xs">{activeAccountType === 'real' ? 'Real' : 'Demo'} | {activeBalance === null ? '--' : activeBalance.toFixed(2)} {account.currency}⌄</button>{isAccountMenuOpen && <div className="absolute right-0 top-12 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; const optionStatus = option.status.toLowerCase(); const unavailable = ['closed', 'disabled', 'suspended', 'inactive'].includes(optionStatus); return <button key={option.account_id} disabled={isActive || unavailable} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive || unavailable ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}<button onClick={handleLogout} className="mt-3 w-full rounded-lg border border-rose-500/40 px-2 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/10">Log out</button></div>}</div> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">Log in</button>}
-          {!account && <a href="https://home.deriv.com/dashboard/signup?_gl=1*4zo6tf*_gcl_au*MTM1MjEzODExOS4xNzg3NzcxMjUx&residence=ke" target="_blank" rel="noreferrer" className="rounded-xl bg-teal-400 px-2.5 py-2 text-[10px] font-extrabold text-[#071217] transition hover:bg-teal-300 sm:px-4 sm:text-xs">Sign up</a>}
+          <button onClick={() => setIsLightTheme((theme) => !theme)} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">{isLightTheme ? 'ðŸŒ™' : 'â˜€ï¸'} <span className="hidden sm:inline">{isLightTheme ? 'Dark' : 'Light'}</span></button>
+          {account ? <div className="relative"><button title={`${activeAccountType === 'real' ? 'Real' : 'Demo'} account ${account.loginid}`} onClick={() => setIsAccountMenuOpen((open) => !open)} className="max-w-[126px] truncate rounded-xl border border-emerald-500/30 px-2 py-2 text-[10px] font-bold text-emerald-300 sm:max-w-none sm:px-3 sm:text-xs">{activeAccountType === 'real' ? 'Real' : 'Demo'} | {activeBalance === null ? '--' : activeBalance.toFixed(2)} {account.currency}âŒ„</button>{isAccountMenuOpen && <div className="absolute right-0 top-12 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; const optionStatus = option.status.toLowerCase(); const unavailable = ['closed', 'disabled', 'suspended', 'inactive'].includes(optionStatus); return <button key={option.account_id} disabled={isActive || unavailable} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive || unavailable ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}<button onClick={handleLogout} className="mt-3 w-full rounded-lg border border-rose-500/40 px-2 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/10">Log out</button></div>}</div> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/20">Connect Deriv</button>}
         </div>
       </header>
 
-      <nav className="md:hidden flex shrink-0 items-stretch gap-1 overflow-x-auto border-b border-[#2a2a36] bg-[#121217] px-2 py-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex h-14 min-h-14 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
         {navigationItems.map((item) => (
           <button
             key={item.id}
             onClick={() => handleNavigation(item.id)}
-            className={`min-w-[92px] flex-1 rounded-xl px-2 py-2 text-[10px] font-bold leading-tight transition-all cursor-pointer whitespace-nowrap ${
+            className={`min-w-[82px] flex-1 rounded-xl px-1.5 py-1.5 text-[9px] font-bold leading-tight transition-all cursor-pointer whitespace-nowrap ${
               currentTab === item.id ? 'bg-teal-400 text-[#071217]' : 'text-gray-400 hover:bg-[#1a1a24] hover:text-white'
             }`}
           >
@@ -1035,8 +951,8 @@ export default function App() {
 
       {/* Manual Trading View */}
       {currentTab === 'manual-trading' && (
-        <div className="flex flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-          <main className="flex-none min-w-0 flex flex-col bg-[#16161c] md:flex-1 md:overflow-y-auto p-2 sm:p-6 space-y-2 sm:space-y-4">
+        <div className="flex flex-1 flex-col overflow-hidden pb-16 md:flex-row md:overflow-hidden md:pb-0">
+          <main className="flex-none min-w-0 flex flex-col bg-[#16161c] md:flex-1 md:overflow-y-auto p-2 pb-24 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
             <div className="flex items-center justify-between bg-[#1b1b24] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-[#262633] shadow-md shrink-0">
               <div className="flex items-center space-x-3">
                 <span className={`w-3 h-3 rounded-full ${marketStatus.includes('Live') ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
@@ -1063,14 +979,14 @@ export default function App() {
               <div className="text-xs text-gray-400">Status: <span className="text-white font-semibold">{marketStatus}</span></div>
             </div>
 
-            <div className="flex-none min-h-[150px] items-center justify-start bg-[#1b1b24]/40 border border-[#262633] rounded-2xl p-2 pt-4 sm:p-8 md:flex md:flex-1 md:min-h-0 md:justify-center md:pt-8 relative shadow-inner">
-              <div className="grid grid-cols-5 gap-1.5 sm:gap-6 max-w-2xl w-full justify-items-center">
+            <div className="flex-none min-h-[160px] items-center justify-start bg-[#1b1b24]/40 border border-[#262633] rounded-2xl p-2 pt-3 sm:p-8 md:flex md:flex-1 md:min-h-0 md:justify-center md:pt-8 relative shadow-inner">
+              <div className="grid grid-cols-5 gap-1 sm:gap-2 md:gap-6 max-w-2xl w-full justify-items-center">
                 {digitStats.map((item) => {
                   const isSelected = selectedDigit === item.digit;
                   const isCurrent = lastDigit === item.digit;
                   const isLowest = item.pct === minPct && totalTicks > 5;
-                  
-                  const radius = 34;
+
+                  const radius = 30;
                   const circumference = 2 * Math.PI * radius;
                   const strokeDashoffset = circumference - (item.pct / 100) * circumference;
                   const ringColor = isLowest ? '#ef4444' : (isSelected ? '#2dd4bf' : '#38bdf8');
@@ -1079,10 +995,11 @@ export default function App() {
                     <button
                       key={item.digit}
                       onClick={() => setSelectedDigit(item.digit)}
-                      className={`relative w-[clamp(3.25rem,16vw,5rem)] h-[clamp(3.25rem,16vw,5rem)] rounded-full flex flex-col items-center justify-center transition-all cursor-pointer ${
-                        isSelected ? 'bg-[#222230] shadow-lg shadow-teal-500/20' : 'bg-[#1b1b24] hover:border-gray-500'
+                      className={`relative w-[clamp(2.2rem,12vw,4.5rem)] h-[clamp(2.2rem,12vw,4.5rem)] rounded-full flex flex-col items-center justify-center transition-all cursor-pointer border ${
+                        isSelected ? 'border-2 border-teal-300 bg-[#1d1d2b] shadow-[0_0_0_3px_rgba(45,212,191,0.42)]' : 'border border-[#2a2a36] bg-[#1b1b24] hover:border-gray-500'
                       }`}
                     >
+                      {isSelected && <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)] z-20" />}
                       <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 80 80">
                         <circle cx="40" cy="40" r={radius} stroke="#262633" strokeWidth="3" fill="transparent" />
                         <circle
@@ -1091,12 +1008,12 @@ export default function App() {
                           strokeLinecap="round" fill="transparent" className="transition-all duration-500"
                         />
                       </svg>
-                      <span className="text-xl font-bold font-mono text-white z-10">{item.digit}</span>
-                      <span className={`text-[10px] font-semibold mt-0.5 z-10 ${isLowest ? 'text-rose-400' : 'text-gray-400'}`}>
+                      <span className="text-base font-bold font-mono text-white z-10 sm:text-xl">{item.digit}</span>
+                      <span className={`text-[8px] font-semibold mt-0.5 z-10 ${isLowest ? 'text-rose-400' : 'text-gray-400'}`}>
                         {item.pct}%
                       </span>
                       {isCurrent && (
-                        <span className="absolute -bottom-1 w-2 h-2 rounded-full bg-teal-400 animate-ping z-20"></span>
+                        <span className="absolute -bottom-1.5 w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_10px_rgba(45,212,191,0.8)] z-20"></span>
                       )}
                     </button>
                   );
@@ -1105,25 +1022,25 @@ export default function App() {
             </div>
           </main>
 
-          <aside className="w-full sm:w-80 bg-[#121217] border-t sm:border-t-0 sm:border-l border-[#22222c] flex flex-col h-auto sm:h-full text-white p-3 sm:p-5 justify-between shrink-0 gap-3 sm:gap-0">
+          <aside className="w-full sm:w-80 bg-[#121217] border-t sm:border-t-0 sm:border-l border-[#22222c] flex flex-col h-auto text-white p-2.5 pb-24 sm:h-full sm:p-5 sm:pb-5 justify-between shrink-0 gap-2 sm:gap-0">
             <div className="space-y-2 sm:space-y-4">
-              <div className="flex items-center justify-between text-xs font-bold uppercase text-gray-400 border-b border-[#22222c] pb-2">
-                <select value={tradeMode} onChange={(event) => setTradeMode(event.target.value as TradeMode)} className="max-w-[70%] bg-transparent text-xs font-bold uppercase text-gray-300 outline-none">
+              <div className="flex items-center justify-between border-b border-[#22222c] pb-1.5 text-[10px] font-bold uppercase text-gray-400 sm:pb-2 sm:text-xs">
+                <select value={tradeMode} onChange={(event) => setTradeMode(event.target.value as TradeMode)} className="max-w-[70%] bg-transparent text-[10px] font-bold uppercase text-gray-300 outline-none sm:text-xs">
                   {TRADE_MODES.map((mode) => <option key={mode.id} value={mode.id} className="bg-[#17171f]">{mode.label}</option>)}
                 </select>
                 {isDigitMode && <span className="text-teal-400 font-mono">Barrier: {selectedDigit}</span>}
               </div>
 
-              <div className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2.5">
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.12em] text-gray-400">
+              <div className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2 sm:p-2.5">
+                <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.12em] text-gray-400 sm:text-[10px]">
                   <span>Execution</span>
                   <span className="font-bold text-teal-300">{executionMode === 'single' ? 'Single' : 'Cycle'}</span>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] font-bold">
-                  <button type="button" onClick={() => setExecutionMode('single')} className={`rounded-lg px-2 py-2 ${executionMode === 'single' ? 'bg-teal-500 text-black' : 'bg-[#252533] text-gray-300'}`}>One at a time</button>
-                  <button type="button" onClick={() => setExecutionMode('multiple')} className={`rounded-lg px-2 py-2 ${executionMode === 'multiple' ? 'bg-cyan-500 text-black' : 'bg-[#252533] text-gray-300'}`}>Multi trade</button>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[9px] font-bold sm:text-[10px]">
+                  <button type="button" onClick={() => setExecutionMode('single')} className={`rounded-lg px-2 py-1.5 sm:py-2 ${executionMode === 'single' ? 'bg-teal-500 text-black' : 'bg-[#252533] text-gray-300'}`}>One at a time</button>
+                  <button type="button" onClick={() => setExecutionMode('multiple')} className={`rounded-lg px-2 py-1.5 sm:py-2 ${executionMode === 'multiple' ? 'bg-cyan-500 text-black' : 'bg-[#252533] text-gray-300'}`}>Multi trade</button>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-gray-300">
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[9px] text-gray-300 sm:text-[10px]">
                   <label className="rounded-lg border border-[#30313d] bg-[#151821] p-2">
                     <span className="flex items-center justify-between">
                       <span>TP</span>
@@ -1139,50 +1056,45 @@ export default function App() {
                     <input type="number" value={Math.abs(stopLossLimit)} onChange={(event) => setStopLossLimit(-(Number(event.target.value) || 0))} className="mt-2 w-full bg-transparent text-sm font-bold text-white outline-none" />
                   </label>
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-[#30313d] bg-[#151821] p-2 text-[10px] text-gray-400">
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-[#30313d] bg-[#151821] p-2 text-[9px] text-gray-400 sm:text-[10px]">
                   <span>Cycle max</span>
-                  <input type="number" min="1" max="10" value={maxTradesPerCycle} onChange={(event) => setMaxTradesPerCycle(Math.min(10, Math.max(1, Number(event.target.value) || 1)))} className="w-12 bg-transparent text-right text-sm font-bold text-white outline-none" />
+                  <input type="number" min="1" max="10" value={maxTradesPerCycle} onChange={(event) => setMaxTradesPerCycle(Math.min(10, Math.max(1, Number(event.target.value) || 1)))} className="w-10 bg-transparent text-right text-sm font-bold text-white outline-none sm:w-12" />
                 </div>
               </div>
 
               {isDigitMode ? (
-                <div className="grid grid-cols-5 gap-1 sm:gap-1.5 bg-[#1b1b24] p-1.5 sm:p-2 rounded-xl border border-[#262633]">
+                <div className="grid grid-cols-5 gap-1 bg-[#1b1b24] p-2 rounded-xl border border-[#262633]">
                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
-                    <button key={d} onClick={() => setSelectedDigit(d)} className={`py-1 sm:py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${selectedDigit === d ? 'bg-white text-black font-extrabold' : 'text-gray-400 hover:text-white hover:bg-[#252533]'}`}>{d}</button>
+                    <button
+                      key={d}
+                      onClick={() => setSelectedDigit(d)}
+                      className={`py-1 text-[10px] font-bold rounded-lg transition-colors cursor-pointer ${selectedDigit === d ? 'bg-white text-black font-extrabold ring-2 ring-teal-400 ring-offset-1 ring-offset-[#1b1b24]' : 'text-gray-400 hover:text-white hover:bg-[#252533]'}`}
+                    >
+                      {d}
+                    </button>
                   ))}
                 </div>
               ) : (
-                <div className="rounded-xl border border-[#262633] bg-[#1b1b24] p-3 text-center text-xs text-gray-400">Choose a direction below to place this contract.</div>
+                <div className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2 text-center text-[9px] text-gray-400 sm:p-3 sm:text-[10px]">Choose a direction below to place this contract.</div>
               )}
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  onClick={fireAiScanFromMainScreen}
-                  className="w-full rounded-2xl border border-cyan-400/60 bg-cyan-400/12 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200 transition hover:bg-cyan-300 hover:text-slate-950"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
-                    AI Scanner
-                  </span>
-                </button>
-              </div>
               <div className="grid grid-cols-2 gap-2">
-                <label className="rounded-xl border border-[#262633] bg-[#1b1b24] px-2 py-1.5 sm:p-2 text-center text-[9px] sm:text-[10px] uppercase text-gray-500">Ticks
-                  <span className="mt-0.5 sm:mt-1 flex items-center justify-between text-sm font-bold text-white"><button type="button" onClick={() => setTicksCount((value) => Math.max(1, value - 1))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">-</button><span>{ticksCount}</span><button type="button" onClick={() => setTicksCount((value) => value + 1)} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">+</button></span>
+                <label className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2 text-center text-[9px] uppercase text-gray-500 sm:text-[10px]">Ticks
+                  <span className="mt-1 flex items-center justify-between text-sm font-bold text-white"><button type="button" onClick={() => setTicksCount((value) => Math.max(1, value - 1))} className="rounded-lg bg-[#252533] px-2 py-1 text-gray-300">-</button><span>{ticksCount}</span><button type="button" onClick={() => setTicksCount((value) => value + 1)} className="rounded-lg bg-[#252533] px-2 py-1 text-gray-300">+</button></span>
                 </label>
-                <label className="rounded-xl border border-[#262633] bg-[#1b1b24] px-2 py-1.5 sm:p-2 text-center text-[9px] sm:text-[10px] uppercase text-gray-500">Stake
-                  <span className="mt-0.5 sm:mt-1 flex items-center justify-between text-sm font-bold text-white"><button type="button" onClick={() => setStake((value) => Math.max(0.35, Number((value - 0.01).toFixed(2))))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">-</button><input type="number" min="0.35" step="0.01" value={stake || ''} onChange={(event) => setStake(event.target.value === '' ? 0 : Number(event.target.value))} onBlur={() => setStake((value) => Math.max(0.35, value || 0.35))} className="min-w-0 w-full bg-transparent text-center text-sm font-bold text-white outline-none" /><button type="button" onClick={() => setStake((value) => Number((Math.max(0.35, value) + 0.01).toFixed(2)))} className="rounded-lg bg-[#252533] px-2 py-0.5 sm:py-1 text-gray-300">+</button></span>
+                <label className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2 text-center text-[9px] uppercase text-gray-500 sm:text-[10px]">Stake
+                  <input type="number" min="0.35" step="0.01" value={stake} onChange={(event) => setStake(Number(event.target.value))} className="mt-1 w-full bg-transparent text-center text-sm font-bold text-white outline-none" />
                 </label>
               </div>
             </div>
-            <div className="rounded-xl border border-[#22222c] bg-[#17171f] px-3 py-2 text-[10px] font-bold text-gray-300">
+            <div className="rounded-xl border border-[#22222c] bg-[#17171f] px-3 py-2 text-[9px] font-bold text-gray-300 sm:text-[10px]">
               <span className="text-gray-500">Auto-stop:</span> {autoStopStatus}
             </div>
-            <div className="grid grid-cols-2 gap-3 pt-3 sm:pt-4 border-t border-[#22222c]">
-              {tradeButtons.map((button, index) => <button key={button.type} onClick={() => handlePurchase(button.type)} className={`py-2 px-2 rounded-xl text-center font-bold cursor-pointer ${index === 0 ? 'bg-teal-500 text-black' : 'bg-rose-600 text-white'}`}><span className="block">{button.label}</span><span className="mt-1 block text-[10px] font-semibold opacity-80">Payout: {proposalPayouts[button.type] === null || proposalPayouts[button.type] === undefined ? '--' : `${proposalPayouts[button.type]?.toFixed(2)} USD`}</span></button>)}
+            <div className="grid grid-cols-2 gap-2 pt-2 sm:gap-3 sm:pt-4 border-t border-[#22222c]">
+              {tradeButtons.map((button, index) => <button key={button.type} onClick={() => handlePurchase(button.type)} className={`py-2 px-2 rounded-xl text-center font-bold cursor-pointer ${index === 0 ? 'bg-teal-500 text-black' : 'bg-rose-600 text-white'}`}><span className="block text-[10px] sm:text-xs">{button.label}</span><span className="mt-1 block text-[9px] font-semibold opacity-80 sm:text-[10px]">Payout: {proposalPayouts[button.type] === null || proposalPayouts[button.type] === undefined ? '--' : `${proposalPayouts[button.type]?.toFixed(2)} USD`}</span></button>)}
             </div>
             <div className="mt-3 space-y-1.5 rounded-xl border border-[#22222c] bg-[#181820] p-3 text-[11px] sm:hidden">
               <div className="flex items-center justify-between"><span className="text-gray-500">Market</span><span className="font-semibold text-gray-200">{liveMarkets.find((market) => market.id === selectedSymbol)?.name ?? selectedSymbol}</span></div>
-              <div className="flex items-center justify-between"><span className="text-gray-500">Contract</span><span className="font-semibold text-gray-200">{TRADE_MODES.find((mode) => mode.id === tradeMode)?.label}{isDigitMode ? ` · Digit ${selectedDigit}` : ''}</span></div>
+              <div className="flex items-center justify-between"><span className="text-gray-500">Contract</span><span className="font-semibold text-gray-200">{TRADE_MODES.find((mode) => mode.id === tradeMode)?.label}{isDigitMode ? ` Â· Digit ${selectedDigit}` : ''}</span></div>
               <div className="flex items-center justify-between"><span className="text-gray-500">Ticks</span><span className="font-semibold text-gray-200">{ticksCount}</span></div>
               <div className="flex items-center justify-between"><span className="text-gray-500">Stake at risk</span><span className="font-semibold text-white">{stake.toFixed(2)} USD</span></div>
             </div>
@@ -1195,14 +1107,14 @@ export default function App() {
           <div className="hidden md:block"><PositionsDrawer positions={positions} /></div>
           <section className="flex-1 overflow-y-auto p-0 sm:p-6">
           <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col border-x border-[#242630] bg-[#111217]">
-            <div className="flex items-center justify-between border-b border-[#252630] px-4 py-4 sm:px-6"><div><p className="text-lg font-extrabold">Positions</p><p className="mt-1 text-[10px] text-gray-500">Recorded trading activity</p></div><span className="text-gray-500">×</span></div>
+            <div className="flex items-center justify-between border-b border-[#252630] px-4 py-4 sm:px-6"><div><p className="text-lg font-extrabold">Positions</p><p className="mt-1 text-[10px] text-gray-500">Recorded trading activity</p></div><span className="text-gray-500">Ã—</span></div>
             <div className="grid grid-cols-3 border-b border-[#252630]">{(['summary', 'transactions', 'journal'] as const).map((tab) => <button key={tab} onClick={() => setPositionsPanelTab(tab)} className={`border-b-2 px-2 py-3 text-xs font-semibold capitalize transition-colors ${positionsPanelTab === tab ? 'border-rose-500 text-white' : 'border-transparent text-gray-500 hover:text-gray-200'}`}>{tab}</button>)}</div>
             {positionsPanelTab === 'summary' && <>
-              {positions.length === 0 ? <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center px-6 text-center"><div className="grid h-12 w-12 place-items-center rounded-xl border border-[#30313c] bg-[#1b1c25] text-lg">▥</div><p className="mt-4 text-sm font-bold text-gray-200">No positions yet</p><p className="mt-1 text-[10px] text-gray-500">Completed or open trades will appear here.</p></div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => { const profit = position.profit ?? 0; const isSettled = position.status === 'Settled'; return <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-bold">{position.symbol}</p><p className="text-xs text-gray-400">{position.contract} · Contract #{position.id}</p></div><p className={`text-xs font-bold ${isSettled ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}`}>{position.status}</p></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><div><p className="text-[9px] uppercase text-gray-500">Ticks</p><p className="font-bold">{position.ticksElapsed ?? 0}/{position.duration}</p></div><div><p className="text-[9px] uppercase text-gray-500">P/L</p><p className={`font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{profit.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Contract value</p><p className="font-bold">{(position.contractValue ?? position.stake).toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Potential payout</p><p className="font-bold">{(position.payout ?? 0).toFixed(2)} USD</p></div></div></div>; })}</div>}
+              {positions.length === 0 ? <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center px-6 text-center"><div className="grid h-12 w-12 place-items-center rounded-xl border border-[#30313c] bg-[#1b1c25] text-lg">â–¥</div><p className="mt-4 text-sm font-bold text-gray-200">No positions yet</p><p className="mt-1 text-[10px] text-gray-500">Completed or open trades will appear here.</p></div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => { const profit = position.profit ?? 0; const isSettled = position.status === 'Settled'; return <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-bold">{position.symbol}</p><p className="text-xs text-gray-400">{position.contract} Â· Contract #{position.id}</p></div><p className={`text-xs font-bold ${isSettled ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}`}>{position.status}</p></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><div><p className="text-[9px] uppercase text-gray-500">Ticks</p><p className="font-bold">{position.ticksElapsed ?? 0}/{position.duration}</p></div><div><p className="text-[9px] uppercase text-gray-500">P/L</p><p className={`font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{profit.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Contract value</p><p className="font-bold">{(position.contractValue ?? position.stake).toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Potential payout</p><p className="font-bold">{(position.payout ?? 0).toFixed(2)} USD</p></div></div></div>; })}</div>}
               <div className="border-t border-[#252630] px-4 py-5 sm:px-6"><div className="grid grid-cols-3 gap-y-5 text-center"><div><p className="text-[9px] uppercase text-gray-500">Total stake</p><p className="text-xs font-bold">{totalStake.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Total payout</p><p className="text-xs font-bold">{totalPayout.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">No. of runs</p><p className="text-xs font-bold">{positions.length}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts lost</p><p className="text-xs font-bold">{contractsLost}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts won</p><p className="text-xs font-bold">{contractsWon}</p></div><div><p className="text-[9px] uppercase text-gray-500">Total profit/loss</p><p className={`text-xs font-bold ${totalProfitLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{totalProfitLoss.toFixed(2)} USD</p></div></div><button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="mt-5 w-full rounded-xl border border-[#363744] bg-[#1d1e27] py-2.5 text-xs font-bold text-gray-200 transition hover:border-rose-400 hover:text-white">Reset</button></div>
             </>}
-            {positionsPanelTab === 'transactions' && (positions.length === 0 ? <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No transactions yet.</div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4 text-xs"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-white">#{position.id}</p><p className="mt-1 text-gray-400">{position.symbol} · {position.contract}</p></div><span className={position.status === 'Settled' ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}>{position.status}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-gray-400 sm:grid-cols-4"><span>Stake <b className="block text-white">{position.stake.toFixed(2)} USD</b></span><span>Value <b className="block text-white">{(position.contractValue ?? position.stake).toFixed(2)} USD</b></span><span>Payout <b className="block text-white">{(position.payout ?? 0).toFixed(2)} USD</b></span><span>P/L <b className={`block ${position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{(position.profit ?? 0).toFixed(2)} USD</b></span></div></div>)}</div>)}
-            {positionsPanelTab === 'journal' && <div className="p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-gray-500">Performance report</p><p className={`mt-1 text-2xl font-extrabold ${journalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{journalProfit >= 0 ? '+' : ''}{journalProfit.toFixed(2)} USD</p><p className="text-xs text-gray-500">{journalWon} won · {journalLost} lost · {journalStake.toFixed(2)} USD staked</p></div><select value={journalPeriod} onChange={(event) => setJournalPeriod(event.target.value as typeof journalPeriod)} className="rounded-lg border border-[#30313d] bg-[#17171f] px-3 py-2 text-xs font-bold text-white"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="all">All time</option></select></div><div className="mt-5 flex h-32 items-end gap-2 rounded-xl border border-[#262633] bg-[#1b1b24] p-4">{(journalPositions.length ? journalPositions : [{ id: 'empty', profit: 0, stake: 0 }]).map((position, index) => { const height = position.profit === undefined ? 0 : Math.min(100, Math.max(8, Math.abs(position.profit) / Math.max(1, journalStake) * 100)); return <div key={`${position.id}-${index}`} className="flex h-full flex-1 items-end"><div title={`${(position.profit ?? 0).toFixed(2)} USD`} className={`w-full rounded-t-md ${position.profit && position.profit < 0 ? 'bg-rose-400' : 'bg-emerald-400'}`} style={{ height: `${height}%` }} /></div>; })}</div><div className="mt-4 space-y-2">{journalPositions.length === 0 ? <p className="py-5 text-center text-xs text-gray-500">No settled trades for this period.</p> : journalPositions.map((position) => <div key={position.id} className="flex items-center justify-between rounded-xl border border-[#262633] bg-[#1b1b24] p-3 text-xs"><span className="text-gray-400">{position.symbol} · #{position.id}</span><span className={position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}>{(position.profit ?? 0).toFixed(2)} USD</span></div>)}</div></div>}
+            {positionsPanelTab === 'transactions' && (positions.length === 0 ? <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No transactions yet.</div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4 text-xs"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-white">#{position.id}</p><p className="mt-1 text-gray-400">{position.symbol} Â· {position.contract}</p></div><span className={position.status === 'Settled' ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}>{position.status}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-gray-400 sm:grid-cols-4"><span>Stake <b className="block text-white">{position.stake.toFixed(2)} USD</b></span><span>Value <b className="block text-white">{(position.contractValue ?? position.stake).toFixed(2)} USD</b></span><span>Payout <b className="block text-white">{(position.payout ?? 0).toFixed(2)} USD</b></span><span>P/L <b className={`block ${position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{(position.profit ?? 0).toFixed(2)} USD</b></span></div></div>)}</div>)}
+            {positionsPanelTab === 'journal' && <div className="p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-gray-500">Performance report</p><p className={`mt-1 text-2xl font-extrabold ${journalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{journalProfit >= 0 ? '+' : ''}{journalProfit.toFixed(2)} USD</p><p className="text-xs text-gray-500">{journalWon} won Â· {journalLost} lost Â· {journalStake.toFixed(2)} USD staked</p></div><select value={journalPeriod} onChange={(event) => setJournalPeriod(event.target.value as typeof journalPeriod)} className="rounded-lg border border-[#30313d] bg-[#17171f] px-3 py-2 text-xs font-bold text-white"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="all">All time</option></select></div><div className="mt-5 flex h-32 items-end gap-2 rounded-xl border border-[#262633] bg-[#1b1b24] p-4">{(journalPositions.length ? journalPositions : [{ id: 'empty', profit: 0, stake: 0 }]).map((position, index) => { const height = position.profit === undefined ? 0 : Math.min(100, Math.max(8, Math.abs(position.profit) / Math.max(1, journalStake) * 100)); return <div key={`${position.id}-${index}`} className="flex h-full flex-1 items-end"><div title={`${(position.profit ?? 0).toFixed(2)} USD`} className={`w-full rounded-t-md ${position.profit && position.profit < 0 ? 'bg-rose-400' : 'bg-emerald-400'}`} style={{ height: `${height}%` }} /></div>; })}</div><div className="mt-4 space-y-2">{journalPositions.length === 0 ? <p className="py-5 text-center text-xs text-gray-500">No settled trades for this period.</p> : journalPositions.map((position) => <div key={position.id} className="flex items-center justify-between rounded-xl border border-[#262633] bg-[#1b1b24] p-3 text-xs"><span className="text-gray-400">{position.symbol} Â· #{position.id}</span><span className={position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}>{(position.profit ?? 0).toFixed(2)} USD</span></div>)}</div></div>}
           </div>
           </section>
         </main>
@@ -1234,7 +1146,7 @@ export default function App() {
                 <button onClick={() => { setSelectedBotTemplate(recommendedTemplate); setCurrentTab('bot-builder'); setAiScannerOpen(false); loadBotTemplate(recommendedTemplate); }} className="rounded-xl bg-teal-400 px-4 py-2 text-[11px] font-black uppercase text-[#071217] hover:bg-teal-300">Load Bot</button>
               </div>
             </section>}
-            <div className="overflow-hidden rounded-2xl border border-cyan-500/30 bg-[#08131c] p-5"><div className="flex items-center gap-4"><div className="relative grid h-14 w-14 place-items-center rounded-xl border border-cyan-400/50 bg-cyan-400/10 text-2xl shadow-[0_0_25px_rgba(34,211,238,0.25)]"><span className="animate-pulse">◉</span><span className="absolute inset-0 animate-ping rounded-xl border border-cyan-400/40" /></div><div><p className="font-mono text-sm font-bold text-cyan-300">SIGNAL ENGINE // {isSearchingSignals ? 'SEARCHING...' : 'SCAN COMPLETE'}</p><p className="mt-1 text-xs text-slate-400">{isSearchingSignals ? `Scanning ${signalMarket} patterns and digit frequencies` : `Hourly scan ready for ${signalMarket}`}</p></div></div><div className="mt-4 h-1 overflow-hidden rounded-full bg-slate-800"><div className={`h-full bg-cyan-400 transition-all duration-700 ${isSearchingSignals ? 'w-2/3 animate-pulse' : 'w-full'}`} /></div></div>
+            <div className="overflow-hidden rounded-2xl border border-cyan-500/30 bg-[#08131c] p-5"><div className="flex items-center gap-4"><div className="relative grid h-14 w-14 place-items-center rounded-xl border border-cyan-400/50 bg-cyan-400/10 text-2xl shadow-[0_0_25px_rgba(34,211,238,0.25)]"><span className="animate-pulse">â—‰</span><span className="absolute inset-0 animate-ping rounded-xl border border-cyan-400/40" /></div><div><p className="font-mono text-sm font-bold text-cyan-300">SIGNAL ENGINE // {isSearchingSignals ? 'SEARCHING...' : 'SCAN COMPLETE'}</p><p className="mt-1 text-xs text-slate-400">{isSearchingSignals ? `Scanning ${signalMarket} patterns and digit frequencies` : `Hourly scan ready for ${signalMarket}`}</p></div></div><div className="mt-4 h-1 overflow-hidden rounded-full bg-slate-800"><div className={`h-full bg-cyan-400 transition-all duration-700 ${isSearchingSignals ? 'w-2/3 animate-pulse' : 'w-full'}`} /></div></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#262633] bg-[#1b1b24] p-5"><p className="text-xs uppercase text-gray-500">Even / Odd</p><p className="mt-2 text-lg font-extrabold text-teal-400">{analysisStats.filter((item) => item.digit % 2 === 0).reduce((sum, item) => sum + item.pct, 0)}% Even</p><p className="text-sm text-gray-400">{analysisStats.filter((item) => item.digit % 2 !== 0).reduce((sum, item) => sum + item.pct, 0)}% Odd</p><p className="mt-3 text-xs text-gray-500">Suggested side: {analysisStats.filter((item) => item.digit % 2 === 0).reduce((sum, item) => sum + item.count, 0) >= analysisStats.filter((item) => item.digit % 2 !== 0).reduce((sum, item) => sum + item.count, 0) ? 'Even' : 'Odd'}</p></div>
               <div className="rounded-2xl border border-[#262633] bg-[#1b1b24] p-5"><p className="text-xs uppercase text-gray-500">Over / Under</p><p className="mt-2 text-lg font-extrabold text-teal-400">{analysisStats.filter((item) => item.digit > 5).reduce((sum, item) => sum + item.pct, 0)}% Over 5</p><p className="text-sm text-gray-400">{analysisStats.filter((item) => item.digit < 5).reduce((sum, item) => sum + item.pct, 0)}% Under 5</p><p className="mt-3 text-xs text-gray-500">Most common digit: {analysisStats.reduce((best, item) => item.count > best.count ? item : best, analysisStats[0]).digit}</p></div>
@@ -1248,7 +1160,7 @@ export default function App() {
       {/* Dashboard View */}
       {currentTab === 'dashboard' && (
         <main className="flex-1 overflow-y-auto bg-[#16161c] p-6 text-white sm:p-10">
-          <div className="mx-auto max-w-5xl"><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">Smart Trades</p><h1 className="mt-2 text-3xl font-black">Trading dashboard</h1><p className="mt-3 max-w-2xl text-sm text-gray-400">Monitor your Deriv connection, open positions, and automated bot workspace from one place.</p><div className="mt-8 grid gap-4 sm:grid-cols-3"><button onClick={() => setCurrentTab('manual-trading')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">▦</span><strong className="mt-4 block text-sm">Manual trading</strong><span className="mt-1 block text-xs text-gray-500">Open the live trading workspace</span></button><button onClick={() => setCurrentTab('bots')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">🤖</span><strong className="mt-4 block text-sm">Bots</strong><span className="mt-1 block text-xs text-gray-500">Browse pre-built XML strategies</span></button><button onClick={() => setCurrentTab('positions')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">◫</span><strong className="mt-4 block text-sm">Positions</strong><span className="mt-1 block text-xs text-gray-500">Review active and settled trades</span></button></div></div>
+          <div className="mx-auto max-w-5xl"><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">Smart Trades</p><h1 className="mt-2 text-3xl font-black">Trading dashboard</h1><p className="mt-3 max-w-2xl text-sm text-gray-400">Monitor your Deriv connection, open positions, and automated bot workspace from one place.</p><div className="mt-8 grid gap-4 sm:grid-cols-3"><button onClick={() => setCurrentTab('manual-trading')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">â–¦</span><strong className="mt-4 block text-sm">Manual trading</strong><span className="mt-1 block text-xs text-gray-500">Open the live trading workspace</span></button><button onClick={() => setCurrentTab('bots')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">ðŸ¤–</span><strong className="mt-4 block text-sm">Bots</strong><span className="mt-1 block text-xs text-gray-500">Browse pre-built XML strategies</span></button><button onClick={() => setCurrentTab('positions')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">â—«</span><strong className="mt-4 block text-sm">Positions</strong><span className="mt-1 block text-xs text-gray-500">Review active and settled trades</span></button></div></div>
         </main>
       )}
 
@@ -1258,7 +1170,7 @@ export default function App() {
           <div className="mx-auto max-w-[1500px]">
             <div className="mb-6 rounded-b-3xl bg-gradient-to-r from-[#111827] via-[#172338] to-[#0b3438] p-7 shadow-xl"><p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">Bots</p><h1 className="mt-2 text-3xl font-black">Pre-built strategies</h1><div className="mt-6 flex gap-3"><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">{BOT_TEMPLATES.length}</strong><span className="text-[10px] text-slate-300">AI Bots</span></div><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">24/7</strong><span className="text-[10px] text-slate-300">Automation</span></div><div className="rounded-xl bg-black/20 px-4 py-3"><strong className="block text-xl text-cyan-300">LIVE</strong><span className="text-[10px] text-slate-300">Execution</span></div></div></div>
             <div className="mb-6 flex flex-wrap gap-3"><label className="cursor-pointer rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm"><span>Upload XML</span><input type="file" accept=".xml,.json" onChange={handleFileUpload} className="hidden" /></label><button onClick={handleGoogleSignIn} className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm">Import from Drive</button><button onClick={() => setCurrentTab('bot-builder')} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm">Open Bot Builder</button></div>
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">{BOT_TEMPLATES.map((template) => <article key={template.id} className={`rounded-2xl bg-gradient-to-br ${template.accent} p-4 shadow-lg`}><div className="flex items-start justify-between"><div className="grid h-14 w-14 place-items-center rounded-xl bg-[#071b2c] text-2xl shadow-inner">🤖</div><span className="rounded-full bg-emerald-400 px-3 py-1 text-[10px] font-black text-emerald-950">FREE</span></div><h2 className="mt-4 text-base font-black">{template.name}</h2><p className="mt-1 text-xs text-white/80">{template.description}</p><p className="mt-4 text-[10px] text-white/80">Deriv Blockly XML · Auto Trade</p><button onClick={() => loadBotTemplate(template)} className="mt-3 w-full rounded-xl bg-blue-500 px-4 py-3 text-xs font-black text-white shadow-lg hover:bg-blue-400">Load Bot</button></article>)}</div>
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">{BOT_TEMPLATES.map((template) => <article key={template.id} className={`rounded-2xl bg-gradient-to-br ${template.accent} p-4 shadow-lg`}><div className="flex items-start justify-between"><div className="grid h-14 w-14 place-items-center rounded-xl bg-[#071b2c] text-2xl shadow-inner">ðŸ¤–</div><span className="rounded-full bg-emerald-400 px-3 py-1 text-[10px] font-black text-emerald-950">FREE</span></div><h2 className="mt-4 text-base font-black">{template.name}</h2><p className="mt-1 text-xs text-white/80">{template.description}</p><p className="mt-4 text-[10px] text-white/80">Deriv Blockly XML Â· Auto Trade</p><button onClick={() => loadBotTemplate(template)} className="mt-3 w-full rounded-xl bg-blue-500 px-4 py-3 text-xs font-black text-white shadow-lg hover:bg-blue-400">Load Bot</button></article>)}</div>
             {dashboardBots.length > 0 && <section className="mt-8 rounded-2xl bg-[#111827] p-5"><h2 className="text-sm font-black">Imported bots</h2><div className="mt-3 space-y-2">{dashboardBots.map((bot) => <div key={bot.id} className="flex items-center justify-between rounded-xl bg-white/10 px-4 py-3 text-xs"><span>{bot.name}</span><span className="flex gap-3"><button onClick={() => handleDuplicateBot(bot)} className="text-cyan-300">Duplicate</button><button onClick={() => handleDeleteBot(bot.id)} className="text-rose-300">Delete</button></span></div>)}</div></section>}
           </div>
         </main>
@@ -1271,15 +1183,22 @@ export default function App() {
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff444f] text-sm font-black text-white">D</span>
               <div>
                 <p className="text-sm font-extrabold">{selectedBotTemplate?.name ?? activeStrategyConfig?.strategyName ?? 'Deriv Bot Builder'}</p>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">official embedded build · {botBuilderLastEvent}</p>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">official embedded build Â· {botBuilderLastEvent}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               {activeStrategyConfig && (
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300">
-                  {activeStrategyConfig.strategyName} · {activeStrategyConfig.initialStake} USD
+                  {activeStrategyConfig.strategyName} Â· {activeStrategyConfig.initialStake} USD
                 </div>
               )}
+              <button
+                onClick={() => void runLoadedBot()}
+                disabled={isBotBuilderRunning || !selectedBotTemplate && !activeStrategyConfig}
+                className="rounded-lg border border-cyan-400/50 bg-cyan-400/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-400 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isBotBuilderRunning ? 'Running...' : 'Run Bot'}
+              </button>
               <button
                 onClick={() => setCurrentTab('dashboard')}
                 className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-200 transition hover:border-slate-500 hover:text-white"
@@ -1311,6 +1230,43 @@ export default function App() {
         </div>
       )}
 
+      {currentTab === 'copy-trading' && (
+        <main className="flex-1 overflow-y-auto bg-[#16161c] p-4 text-white sm:p-8">
+          <div className="mx-auto max-w-5xl space-y-5">
+            <div className="flex items-end justify-between gap-3 border-b border-[#262633] pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-400">Copy trading</p>
+                <h1 className="mt-1 text-2xl font-extrabold">Follow proven trading profiles</h1>
+              </div>
+              <button onClick={() => setCurrentTab('dashboard')} className="rounded-xl border border-[#30303d] bg-[#1b1b24] px-3 py-2 text-[10px] font-bold uppercase text-gray-200">Back to dashboard</button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {[
+                { name: 'Smartest Trades Alpha', winRate: '91.4%', profit: '+18.4%', risk: 'Medium', description: 'Volatility 100 / fast recovery strategy' },
+                { name: 'Recovery Pulse', winRate: '87.9%', profit: '+12.7%', risk: 'Low', description: 'Balanced daily execution with low drawdown' },
+                { name: 'Momentum Burst', winRate: '84.6%', profit: '+14.1%', risk: 'High', description: 'High-conviction jump and burst trades' },
+              ].map((profile) => (
+                <div key={profile.name} className="rounded-2xl border border-[#262633] bg-[#1b1b24] p-5 shadow-lg shadow-black/10">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-base font-extrabold text-white">{profile.name}</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-cyan-300">{profile.risk} risk</p>
+                    </div>
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black uppercase text-emerald-300">{profile.profit}</span>
+                  </div>
+                  <p className="mt-3 text-sm text-gray-400">{profile.description}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-gray-300">
+                    <div className="rounded-xl border border-[#30303d] bg-[#17171f] p-2"><span className="block text-[9px] uppercase text-gray-500">Win rate</span><strong className="mt-1 block text-sm text-white">{profile.winRate}</strong></div>
+                    <div className="rounded-xl border border-[#30303d] bg-[#17171f] p-2"><span className="block text-[9px] uppercase text-gray-500">Theme</span><strong className="mt-1 block text-sm text-white">AI scan</strong></div>
+                  </div>
+                  <button onClick={() => { setCurrentTab('manual-trading'); setSelectedSymbol('1HZ100V'); }} className="mt-4 w-full rounded-xl bg-teal-500 px-3 py-2 text-xs font-black uppercase text-[#071217] hover:bg-teal-400">Copy this setup</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+      )}
+
       {/* Quick Strategy Modal */}
       {isQuickStrategyOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1321,7 +1277,7 @@ export default function App() {
                 onClick={() => setIsQuickStrategyOpen(false)}
                 className="text-gray-400 hover:text-gray-700 text-xl font-bold cursor-pointer"
               >
-                ✕
+                âœ•
               </button>
             </div>
 
@@ -1338,7 +1294,7 @@ export default function App() {
                       {quickStrategyStep === 'template' ? (
                         <span className="w-2 h-2 rounded-full bg-white"></span>
                       ) : (
-                        <span className="text-[10px] text-white font-bold">✓</span>
+                        <span className="text-[10px] text-white font-bold">âœ“</span>
                       )}
                     </div>
                     <div className="font-bold text-gray-900">Choose template</div>
@@ -1506,7 +1462,7 @@ export default function App() {
         aria-label="Launch AI scanner"
       >
         <span className="floating-ai-scan__halo" />
-        <span className="floating-ai-scan__icon">✦</span>
+        <span className="floating-ai-scan__icon">âœ¦</span>
       </button>
 
       {authStatus === 'failed' && <div className="fixed bottom-16 left-1/2 z-40 max-w-[min(90vw,32rem)] -translate-x-1/2 rounded-xl border border-rose-500/40 bg-[#29151b] px-4 py-3 text-xs text-rose-200 shadow-xl">Deriv login could not be completed: {authError || 'Please try again.'}</div>}
@@ -1536,12 +1492,36 @@ export default function App() {
           <section className="w-full max-w-md rounded-2xl border border-[#30303d] bg-[#17171f] p-6 text-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cashier-title" onClick={(event) => event.stopPropagation()}>
             <div className="mb-5 flex items-start justify-between"><div><p className="text-[10px] font-bold tracking-[0.18em] text-emerald-400">{account.loginid}</p><h2 id="cashier-title" className="mt-2 text-2xl font-extrabold">Cashier</h2></div><button onClick={() => setIsCashierOpen(false)} className="text-2xl text-gray-400 hover:text-white" aria-label="Close cashier">&times;</button></div>
             <div className="rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-xs text-gray-400">Available balance</p><p className="mt-1 text-2xl font-extrabold text-emerald-400">{account.balance === null ? '--' : account.balance.toFixed(2)} {account.currency}</p></div>
-            <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-[#121217] p-1">{(['deposit', 'withdraw', 'history'] as const).map((tab) => <button key={tab} onClick={() => setCashierTab(tab)} className={`rounded-lg px-2 py-2 text-xs font-bold capitalize ${cashierTab === tab ? 'bg-emerald-500/20 text-emerald-300' : 'text-gray-500 hover:text-gray-200'}`}>{tab}</button>)}</div>
-            {cashierTab === 'history' ? (cashierTransactions.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-[#30303d] p-8 text-center text-xs text-gray-500">No transactions</div> : <div className="mt-4 space-y-2">{cashierTransactions.map((tx) => <div key={tx.id} className="flex items-center justify-between rounded-xl border border-[#30303d] bg-[#121217] p-3"><div><p className="text-xs font-bold capitalize text-gray-200">{tx.type} · {tx.phone}</p><p className="mt-0.5 text-[10px] text-gray-500">{new Date(tx.createdAt).toLocaleString()}</p></div><div className="text-right"><p className="text-sm font-bold text-white">{tx.amount.toFixed(2)} {tx.currency}</p><p className={`text-[10px] font-bold capitalize ${tx.status === 'completed' ? 'text-emerald-400' : tx.status === 'failed' ? 'text-rose-400' : 'text-amber-400'}`}>{tx.status}</p></div></div>)}</div>) : <div className="mt-4 rounded-xl border border-[#30303d] bg-[#121217] p-4"><p className="text-sm font-bold text-gray-200">{cashierTab === 'deposit' ? 'Pay with M-Pesa' : 'Withdraw to M-Pesa'}</p><label className="mt-4 block text-[10px] font-bold uppercase tracking-wider text-gray-500">Phone</label><input value={cashierPhone} onChange={(event) => setCashierPhone(event.target.value)} className="mt-1 w-full rounded-lg border border-[#30303d] bg-[#17171f] px-3 py-2 text-sm text-white outline-none" inputMode="tel" placeholder="07XX XXX XXX" /><label className="mt-3 block text-[10px] font-bold uppercase tracking-wider text-gray-500">M-Pesa amount in KES · min 10</label><input value={cashierAmount} onChange={(event) => setCashierAmount(event.target.value)} className="mt-1 w-full rounded-lg border border-[#30303d] bg-[#17171f] px-3 py-2 text-sm text-white outline-none" type="number" min="10" step="1" placeholder="0" /><div className="mt-3 flex gap-1.5">{[100, 250, 500, 1000, 2500].map((amount) => <button key={amount} onClick={() => setCashierAmount(String(amount))} className="rounded-md border border-[#30303d] px-2 py-1 text-[10px] text-gray-400 hover:border-emerald-400 hover:text-emerald-300">KES {amount}</button>)}</div><button disabled={cashierTab !== 'deposit' || isCashierSubmitting} onClick={() => void handleCashierDeposit()} className="mt-4 w-full rounded-lg bg-emerald-500/20 px-3 py-2 text-xs font-bold text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50">{cashierTab === 'deposit' ? (isCashierSubmitting ? 'Sending prompt...' : 'Pay with M-Pesa') : 'Request withdrawal (coming soon)'}</button>{cashierStatus && <p className="mt-3 text-center text-[10px] text-gray-400">{cashierStatus}</p>}</div>}
-            <p className="mt-4 text-center text-[10px] text-gray-600">Powered by Safaricom Daraja</p>
+            <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-[#121217] p-1">{(['deposit', 'withdraw'] as const).map((tab) => <button key={tab} onClick={() => setCashierTab(tab)} className={`rounded-lg px-2 py-2 text-xs font-bold capitalize ${cashierTab === tab ? 'bg-emerald-500/20 text-emerald-300' : 'text-gray-500 hover:text-gray-200'}`}>{tab}</button>)}</div>
+            <div className="mt-4 rounded-xl border border-[#30303d] bg-[#121217] p-4">
+              <div className="flex items-center justify-between gap-3 border-b border-[#30303d] pb-3">
+                <div>
+                  <p className="text-sm font-bold text-gray-200">{cashierTab === 'deposit' ? 'Deriv cashier: Deposit' : 'Deriv cashier: Withdraw'}</p>
+                  <p className="mt-1 text-[10px] text-gray-500">Dusupay funding for USD account</p>
+                </div>
+                <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-300">Deriv</span>
+              </div>
+              <ol className="mt-4 space-y-3 text-xs text-gray-300">
+                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">1</span>Open the Deriv cashier page from the button below.</li>
+                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">2</span>For deposit, scroll down and select <span className="font-bold text-white">Mobile Money / Dusupay</span>.</li>
+                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">3</span>Choose the amount, confirm the payment, and your USD balance updates on Deriv.</li>
+                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">4</span>For withdrawal, use the secure Deriv withdraw flow and select the relevant withdrawal method.</li>
+              </ol>
+              <div className="mt-4 grid grid-cols-1 gap-2">
+                <a href={cashierTab === 'deposit' ? DERIV_DEPOSIT_URL : DERIV_WITHDRAW_URL} target="_blank" rel="noreferrer" className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-center text-sm font-bold text-[#071217] transition hover:bg-emerald-400">
+                  {cashierTab === 'deposit' ? 'Open Deriv deposit page' : 'Open Deriv withdraw page'}
+                </a>
+                <button onClick={() => setCashierTab(cashierTab === 'deposit' ? 'withdraw' : 'deposit')} className="w-full rounded-xl border border-[#30303d] bg-[#17171f] px-4 py-3 text-sm font-bold text-gray-200 transition hover:border-emerald-500 hover:text-white">
+                  Switch to {cashierTab === 'deposit' ? 'withdraw' : 'deposit'}
+                </button>
+              </div>
+              <p className="mt-4 text-center text-[10px] text-gray-600">Powered by Deriv Cashier • Dusupay</p>
+            </div>
           </section>
         </div>
       )}
     </div>
   );
 }
+
+
