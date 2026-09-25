@@ -949,7 +949,7 @@ export default function App() {
 
     const selected = amountMap[mode];
     const simulated: Position = {
-      id: `admin-${Date.now()}`,
+      id: `sim-${Date.now()}`,
       symbol: selectedSymbol,
       contract: tradeMode,
       stake: selected.stake,
@@ -1233,7 +1233,46 @@ export default function App() {
               <div className="border-t border-[#252630] px-4 py-5 sm:px-6"><div className="grid grid-cols-3 gap-y-5 text-center"><div><p className="text-[9px] uppercase text-gray-500">Total stake</p><p className="text-xs font-bold">{totalStake.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">Total payout</p><p className="text-xs font-bold">{totalPayout.toFixed(2)} USD</p></div><div><p className="text-[9px] uppercase text-gray-500">No. of runs</p><p className="text-xs font-bold">{positions.length}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts lost</p><p className="text-xs font-bold">{contractsLost}</p></div><div><p className="text-[9px] uppercase text-gray-500">Contracts won</p><p className="text-xs font-bold">{contractsWon}</p></div><div><p className="text-[9px] uppercase text-gray-500">Total profit/loss</p><p className={`text-xs font-bold ${totalProfitLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{totalProfitLoss.toFixed(2)} USD</p></div></div><button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="mt-5 w-full rounded-xl border border-[#363744] bg-[#1d1e27] py-2.5 text-xs font-bold text-gray-200 transition hover:border-rose-400 hover:text-white">Reset</button></div>
             </>}
             {positionsPanelTab === 'transactions' && (positions.length === 0 ? <div className="flex min-h-[340px] flex-1 items-center justify-center p-6 text-xs text-gray-500">No transactions yet.</div> : <div className="space-y-2 p-4 sm:p-6">{positions.map((position) => <div key={position.id} className="rounded-xl border border-[#262633] bg-[#1b1b24] p-4 text-xs"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-white">#{position.id}</p><p className="mt-1 text-gray-400">{position.symbol} · {position.contract}</p></div><span className={position.status === 'Settled' ? (position.result === 'won' ? 'text-emerald-400' : 'text-rose-400') : 'text-amber-300'}>{position.status}</span></div><div className="mt-3 grid grid-cols-2 gap-3 text-gray-400 sm:grid-cols-4"><span>Stake <b className="block text-white">{position.stake.toFixed(2)} USD</b></span><span>Value <b className="block text-white">{(position.contractValue ?? position.stake).toFixed(2)} USD</b></span><span>Payout <b className="block text-white">{(position.payout ?? 0).toFixed(2)} USD</b></span><span>P/L <b className={`block ${position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{(position.profit ?? 0).toFixed(2)} USD</b></span></div></div>)}</div>)}
-            {positionsPanelTab === 'journal' && <div className="p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-gray-500">Performance report</p><p className={`mt-1 text-2xl font-extrabold ${journalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{journalProfit >= 0 ? '+' : ''}{journalProfit.toFixed(2)} USD</p><p className="text-xs text-gray-500">{journalWon} won · {journalLost} lost · {journalStake.toFixed(2)} USD staked</p></div><select value={journalPeriod} onChange={(event) => setJournalPeriod(event.target.value as typeof journalPeriod)} className="rounded-lg border border-[#30313d] bg-[#17171f] px-3 py-2 text-xs font-bold text-white"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="all">All time</option></select></div><div className="mt-5 flex h-32 items-end gap-2 rounded-xl border border-[#262633] bg-[#1b1b24] p-4">{(journalPositions.length ? journalPositions : [{ id: 'empty', profit: 0, stake: 0 }]).map((position, index) => { const height = position.profit === undefined ? 0 : Math.min(100, Math.max(8, Math.abs(position.profit) / Math.max(1, journalStake) * 100)); return <div key={`${position.id}-${index}`} className="flex h-full flex-1 items-end"><div title={`${(position.profit ?? 0).toFixed(2)} USD`} className={`w-full rounded-t-md ${position.profit && position.profit < 0 ? 'bg-rose-400' : 'bg-emerald-400'}`} style={{ height: `${height}%` }} /></div>; })}</div><div className="mt-4 space-y-2">{journalPositions.length === 0 ? <p className="py-5 text-center text-xs text-gray-500">No settled trades for this period.</p> : journalPositions.map((position) => <div key={position.id} className="flex items-center justify-between rounded-xl border border-[#262633] bg-[#1b1b24] p-3 text-xs"><span className="text-gray-400">{position.symbol} · #{position.id}</span><span className={position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}>{(position.profit ?? 0).toFixed(2)} USD</span></div>)}</div></div>}
+            {positionsPanelTab === 'journal' && <div className="p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-gray-500">Performance report</p><p className={`mt-1 text-2xl font-extrabold ${journalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{journalProfit >= 0 ? '+' : ''}{journalProfit.toFixed(2)} USD</p><p className="text-xs text-gray-500">{journalWon} won · {journalLost} lost · {journalStake.toFixed(2)} USD staked</p></div><select value={journalPeriod} onChange={(event) => setJournalPeriod(event.target.value as typeof journalPeriod)} className="rounded-lg border border-[#30313d] bg-[#17171f] px-3 py-2 text-xs font-bold text-white"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="all">All time</option></select></div>
+              <div className="mt-5 overflow-hidden rounded-xl border border-[#262633] bg-[#1b1b24] p-4">
+                <div className="mb-3 flex items-center justify-between text-[9px] uppercase tracking-[0.14em] text-gray-500">
+                  <span>Profit/loss</span>
+                  <span>{journalPositions.length} trades</span>
+                </div>
+                <svg viewBox="0 0 320 120" className="h-28 w-full overflow-visible">
+                  <defs>
+                    <linearGradient id="profitLineFill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(16,185,129,0.5)" />
+                      <stop offset="100%" stopColor="rgba(16,185,129,0.02)" />
+                    </linearGradient>
+                  </defs>
+                  {[0, 25, 50, 75, 100].map((line) => (
+                    <line key={line} x1="0" x2="320" y1={120 - (line / 100) * 90} y2={120 - (line / 100) * 90} stroke="rgba(148,163,184,0.18)" strokeDasharray="4 4" />
+                  ))}
+                  {journalPositions.length > 0 ? (() => {
+                    const values = journalPositions.map((position) => position.profit ?? 0);
+                    const maxAbs = Math.max(1, ...values.map((value) => Math.abs(value)));
+                    const points = values.map((value, index) => {
+                      const x = (index / Math.max(values.length - 1, 1)) * 300 + 10;
+                      const y = 100 - (value / maxAbs) * 70 + 10;
+                      return `${x},${y}`;
+                    }).join(' ');
+                    const areaPoints = `${points} 310,110 10,110`;
+                    return <>
+                      <polygon points={areaPoints} fill="url(#profitLineFill)" opacity={0.9} />
+                      <polyline points={points} fill="none" stroke={journalProfit >= 0 ? '#34d399' : '#f87171'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      {values.map((value, index) => {
+                        const x = (index / Math.max(values.length - 1, 1)) * 300 + 10;
+                        const y = 100 - (value / maxAbs) * 70 + 10;
+                        return <circle key={`${value}-${index}`} cx={x} cy={y} r="4" fill={value >= 0 ? '#34d399' : '#f87171'} stroke="#0f172a" strokeWidth="2" />;
+                      })}
+                    </>;
+                  })() : <>
+                    <line x1="10" x2="310" y1="90" y2="90" stroke="rgba(148,163,184,0.3)" strokeWidth="2" strokeLinecap="round" />
+                  </>}
+                </svg>
+              </div>
+              <div className="mt-4 space-y-2">{journalPositions.length === 0 ? <p className="py-5 text-center text-xs text-gray-500">No settled trades for this period.</p> : journalPositions.map((position) => <div key={position.id} className="flex items-center justify-between rounded-xl border border-[#262633] bg-[#1b1b24] p-3 text-xs"><span className="text-gray-400">{position.symbol} · #{position.id}</span><span className={position.profit && position.profit < 0 ? 'text-rose-400' : 'text-emerald-400'}>{(position.profit ?? 0).toFixed(2)} USD</span></div>)}</div></div>}
           </div>
           </section>
         </main>
