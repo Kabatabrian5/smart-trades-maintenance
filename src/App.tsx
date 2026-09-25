@@ -1038,18 +1038,20 @@ export default function App() {
         </div>
       )}
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex h-14 min-h-14 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur shadow-[0_-8px_24px_rgba(0,0,0,0.28)]">
-        {navigationItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => handleNavigation(item.id)}
-            className={`min-w-[82px] flex-1 rounded-xl px-1.5 py-1.5 text-[9px] font-bold leading-tight transition-all cursor-pointer whitespace-nowrap ${
-              currentTab === item.id ? 'bg-teal-400 text-[#071217]' : 'text-gray-400 hover:bg-[#1a1a24] hover:text-white'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+      <nav className="md:hidden border-b border-[#2a2a36] bg-[#121217]/95 px-2 py-2">
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {navigationItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => handleNavigation(item.id)}
+              className={`min-w-[92px] rounded-xl px-2 py-2 text-[9px] font-bold leading-tight transition-all cursor-pointer whitespace-nowrap ${
+                currentTab === item.id ? 'bg-teal-400 text-[#071217]' : 'text-gray-400 hover:bg-[#1a1a24] hover:text-white'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </nav>
 
       {/* Manual Trading View */}
