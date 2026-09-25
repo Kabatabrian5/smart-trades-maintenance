@@ -1675,10 +1675,10 @@ export default function App() {
         </div>
       )}
 
-      <footer className="shrink-0 border-t border-[#22222c] bg-[#0f1016] px-2 py-1.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-gray-400 sm:px-4 sm:py-3 sm:text-[10px]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-1 sm:gap-3">
-          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)] sm:h-2 sm:w-2" />
+      <footer className="fixed inset-x-0 bottom-[3.75rem] z-20 border-t border-[#22222c] bg-[#0f1016]/95 px-2 py-1.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-gray-400 backdrop-blur-sm md:static md:bottom-auto md:z-auto md:border-t md:bg-[#0f1016] md:px-4 md:py-3 md:text-[10px]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-1 sm:gap-3 md:gap-3">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3">
+            <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)] sm:h-2 sm:w-2 md:h-2.5 md:w-2.5" />
             <span className="truncate">{currentDateTime.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
             <span aria-hidden="true">•</span>
             <span className="truncate">{currentDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
