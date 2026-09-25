@@ -215,6 +215,7 @@ export default function App() {
   const [adminUnlocked, setAdminUnlocked] = useState<boolean>(() => sessionStorage.getItem('smart-trades-admin-unlocked') === 'true');
   const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots' | 'copy-trading'>('manual-trading');
   const [isCashierOpen, setIsCashierOpen] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [cashierTab, setCashierTab] = useState<'deposit' | 'withdraw'>('deposit');
   const [availableAccounts, setAvailableAccounts] = useState<DerivOptionsAccount[]>([]);
@@ -230,6 +231,11 @@ export default function App() {
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 1700);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentDateTime(new Date()), 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -1645,6 +1651,18 @@ export default function App() {
           </section>
         </div>
       )}
+
+      <footer className="border-t border-[#22222c] bg-[#0f1016] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]" />
+            <span>{currentDateTime.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+            <span className="hidden sm:inline">•</span>
+            <span>{currentDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+          </div>
+          <span className="text-teal-300">Developed by Brian</span>
+        </div>
+      </footer>
     </div>
   );
 }
