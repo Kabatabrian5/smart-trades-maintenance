@@ -1041,7 +1041,7 @@ export default function App() {
         </div>
       )}
 
-      <nav className="border-b border-[#212833] bg-[#0f141b]/95 px-2 py-2 md:hidden">
+      <nav className="sticky top-0 z-30 border-b border-[#212833] bg-[#0f141b]/95 px-2 py-2 shadow-[0_8px_18px_rgba(5,10,14,0.25)] backdrop-blur sm:px-3 md:hidden">
         <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto pb-1">
           {navigationItems.map((item) => (
             <button
@@ -1059,7 +1059,7 @@ export default function App() {
 
       {/* Manual Trading View */}
       {currentTab === 'manual-trading' && (
-        <div className="flex flex-1 flex-col overflow-hidden pb-16 md:flex-row md:overflow-hidden md:pb-0">
+        <div className="flex flex-1 flex-col overflow-hidden pb-20 md:flex-row md:overflow-hidden md:pb-0">
           <main className="flex-none min-w-0 flex flex-col bg-[#16161c] md:flex-1 md:overflow-y-auto p-2 pb-24 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
             <div className="flex shrink-0 items-center justify-between rounded-2xl border border-[#202a35] bg-[#111b22] px-3 py-2.5 sm:px-4 sm:py-3">
               <div className="flex min-w-0 items-center gap-3">
@@ -1230,7 +1230,7 @@ export default function App() {
       )}
 
       {currentTab === 'positions' && (
-        <main className="flex flex-1 overflow-hidden bg-[#101116] text-white">
+        <main className="flex flex-1 overflow-hidden bg-[#101116] text-white pb-20 md:pb-0">
           <div className="hidden md:block"><PositionsDrawer positions={positions} /></div>
           <section className="flex-1 overflow-y-auto p-0 sm:p-6">
           <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col border-x border-[#242630] bg-[#111217]">
@@ -1287,7 +1287,7 @@ export default function App() {
       )}
 
       {currentTab === 'signal' && (
-        <main className="relative flex-1 overflow-y-auto bg-[#16161c] p-4 text-white sm:p-8">
+        <main className="relative flex-1 overflow-y-auto bg-[#16161c] p-4 pb-20 text-white sm:p-8 sm:pb-20 md:pb-0">
           {isSearchingSignals && <div className="signal-cinema" role="status" aria-live="polite"><div className="signal-cinema__scanline" /><div className="signal-cinema__radar" aria-hidden="true"><span /><i /><b /></div><p className="signal-cinema__eyebrow">SIGNAL ENGINE // LIVE SCAN</p><h2>Reading market behavior</h2><p className="signal-cinema__message">Sampling recent ticks, digit frequency, and contract patterns for {signalMarket}.</p><div className="signal-cinema__steps"><span className="signal-cinema__step signal-cinema__step--active">01 HISTORY</span><span className="signal-cinema__step">02 FREQUENCY</span><span className="signal-cinema__step">03 CONTEXT</span></div><div className="signal-cinema__bar"><span /></div></div>}
           <div className="mx-auto max-w-4xl space-y-5">
             <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-400">Digit signal</p><h1 className="mt-1 text-2xl font-extrabold">Hourly signal</h1><p className="mt-2 text-sm text-gray-400">Choose a market to scan the next hour.</p></div><div className="flex items-center gap-2"><button onClick={handleAiScan} className="rounded-xl bg-cyan-400 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-slate-950 shadow-[0_0_25px_rgba(34,211,238,0.2)] transition hover:bg-cyan-300">AI Scanner</button><select value={signalMarket} onChange={(event) => { setSignalMarket(event.target.value); playSignalBeep(); }} className="rounded-xl border border-[#30303d] bg-[#1b1b24] px-3 py-2 text-sm font-bold text-white outline-none">{liveMarkets.map((market) => <option key={market.id} value={market.id}>{market.name}</option>)}</select></div></div>
@@ -1325,7 +1325,7 @@ export default function App() {
 
       {/* Dashboard View */}
       {currentTab === 'dashboard' && (
-        <main className="flex-1 overflow-y-auto bg-[#16161c] p-6 text-white sm:p-10">
+        <main className="flex-1 overflow-y-auto bg-[#16161c] p-6 pb-20 text-white sm:p-10 sm:pb-20 md:pb-0">
           <div className="mx-auto max-w-5xl"><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">Smart Trades</p><h1 className="mt-2 text-3xl font-black">Trading dashboard</h1><p className="mt-3 max-w-2xl text-sm text-gray-400">Monitor your Deriv connection, open positions, and automated bot workspace from one place.</p><div className="mt-8 grid gap-4 sm:grid-cols-3"><button onClick={() => setCurrentTab('manual-trading')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">▣</span><strong className="mt-4 block text-sm">Manual trading</strong><span className="mt-1 block text-xs text-gray-500">Open the live trading workspace</span></button><button onClick={() => setCurrentTab('bots')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">🤖</span><strong className="mt-4 block text-sm">Bots</strong><span className="mt-1 block text-xs text-gray-500">Browse pre-built XML strategies</span></button><button onClick={() => setCurrentTab('positions')} className="rounded-2xl border border-[#30303d] bg-[#1b1b24] p-5 text-left hover:border-cyan-400"><span className="text-2xl">◫</span><strong className="mt-4 block text-sm">Positions</strong><span className="mt-1 block text-xs text-gray-500">Review active and settled trades</span></button></div></div>
         </main>
       )}
@@ -1409,7 +1409,7 @@ export default function App() {
       )}
 
       {currentTab === 'copy-trading' && (
-        <main className="flex-1 overflow-y-auto bg-[#16161c] p-4 text-white sm:p-8">
+        <main className="flex-1 overflow-y-auto bg-[#16161c] p-4 pb-20 text-white sm:p-8 sm:pb-20 md:pb-0">
           <div className="mx-auto max-w-5xl space-y-5">
             <div className="flex items-end justify-between gap-3 border-b border-[#262633] pb-4">
               <div>
@@ -1699,7 +1699,7 @@ export default function App() {
         </div>
       )}
 
-      <footer className="fixed inset-x-0 bottom-[3.75rem] z-20 border-t border-[#22222c] bg-[#0f1016]/95 px-2 py-1.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-gray-400 backdrop-blur-sm md:static md:bottom-auto md:z-auto md:border-t md:bg-[#0f1016] md:px-4 md:py-3 md:text-[10px]">
+      <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-[#22222c] bg-[#0f1016]/95 px-2 py-1.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-gray-400 backdrop-blur-sm md:static md:bottom-auto md:z-auto md:border-t md:bg-[#0f1016] md:px-4 md:py-3 md:text-[10px]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-1 sm:gap-3 md:gap-3">
           <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3">
             <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)] sm:h-2 sm:w-2 md:h-2.5 md:w-2.5" />
