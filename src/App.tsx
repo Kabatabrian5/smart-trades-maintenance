@@ -436,6 +436,15 @@ export default function App() {
     window.alert('Incorrect admin password');
   }
 
+  function toggleBrianAdmin() {
+    if (appMode === 'admin') {
+      lockAdminAccess();
+      return;
+    }
+
+    requestAdminAccess();
+  }
+
   function lockAdminAccess() {
     setAdminUnlocked(false);
     sessionStorage.removeItem('smart-trades-admin-unlocked');
@@ -997,22 +1006,6 @@ export default function App() {
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          <div className="flex rounded-xl border border-slate-700 bg-[#17171f] p-1">
-            <button
-              type="button"
-              onClick={() => setAppMode('client')}
-              className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition ${appMode === 'client' ? 'bg-teal-500 text-[#071217]' : 'text-gray-400 hover:text-white'}`}
-            >
-              Client
-            </button>
-            <button
-              type="button"
-              onClick={requestAdminAccess}
-              className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition ${appMode === 'admin' ? 'bg-rose-500 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              {adminUnlocked ? 'Admin' : 'Admin 🔒'}
-            </button>
-          </div>
           {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
           <button onClick={() => setIsLightTheme((theme) => !theme)} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">{isLightTheme ? '🌙' : '☀️'} <span className="hidden sm:inline">{isLightTheme ? 'Dark' : 'Light'}</span></button>
           {account && (
@@ -1699,7 +1692,14 @@ export default function App() {
             <span className="hidden sm:inline">•</span>
             <span>{currentDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
           </div>
-          <span className="text-teal-300">Developed by Brian</span>
+          <button
+            type="button"
+            onClick={toggleBrianAdmin}
+            className="cursor-pointer text-teal-300 transition hover:text-teal-200"
+            aria-label={appMode === 'admin' ? 'Return to client mode' : 'Open admin mode'}
+          >
+            {appMode === 'admin' ? 'Back to client' : 'Developed by Brian'}
+          </button>
         </div>
       </footer>
     </div>
