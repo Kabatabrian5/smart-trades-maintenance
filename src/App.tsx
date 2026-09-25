@@ -984,20 +984,23 @@ export default function App() {
   return (
     <div className={`${isLightTheme ? 'theme-light' : ''} flex flex-col h-screen w-screen overflow-hidden bg-[#16161c] text-white font-sans relative`}>
       {isBooting && <div className="platform-boot" role="status" aria-live="polite"><div className="platform-boot__scan" /><div className="platform-boot__logo"><img src="/favicon.svg" alt="" /><span>Smartest Trades</span></div><div className="platform-boot__network" aria-hidden="true"><i /><i /><i /><i /><i /><b /></div><p className="platform-boot__name">Smart trades</p><p className="platform-boot__status">AI powered bots</p><div className="platform-boot__line"><span /></div><p className="platform-boot__readout">Optimizing execution logic...</p></div>}
-      <header className="h-auto min-h-14 bg-[#121217] border-b border-[#22222c] flex items-center justify-between px-3 py-2 sm:px-6 sm:py-0 shrink-0 z-20 gap-2">
-        <div className="flex items-center space-x-6 min-w-0">
-          <div className="flex items-center space-x-2">
-            <span className="w-7 h-7 rounded-lg bg-gradient-to-tr from-teal-500 to-blue-600 flex items-center justify-center font-extrabold text-black text-xs">ST</span>
-            <span className="hidden font-extrabold text-sm tracking-wide text-white whitespace-nowrap sm:inline">Smartest <span className="text-teal-400">Trades</span></span>
+      <header className="h-auto min-h-[60px] shrink-0 border-b border-[#22222c] bg-[#101319] px-3 py-2.5 sm:px-5 z-20">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 via-cyan-400 to-blue-500 text-[10px] font-black text-slate-950 shadow-[0_0_20px_rgba(45,212,191,0.35)]">ST</div>
+            <div className="hidden min-w-0 items-center md:flex">
+              <span className="truncate text-sm font-black tracking-[0.08em] text-white">SMARTEST</span>
+              <span className="ml-1.5 truncate text-sm font-black tracking-[0.08em] text-teal-300">TRADES</span>
+            </div>
           </div>
 
-          <nav className="hidden md:flex items-center space-x-1 overflow-x-auto">
+          <nav className="hidden items-center gap-1 overflow-x-auto md:flex">
             {navigationItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => handleNavigation(item.id)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  currentTab === item.id ? 'bg-[#222230] text-teal-400 shadow' : 'text-gray-400 hover:text-white hover:bg-[#1a1a24]'
+                className={`rounded-xl px-2.5 py-2 text-[10px] font-bold tracking-[0.04em] transition-all ${
+                  currentTab === item.id ? 'bg-[#1d2f37] text-teal-300 shadow-[inset_0_0_0_1px_rgba(45,212,191,0.35)]' : 'text-slate-300 hover:bg-[#1b2029] hover:text-white'
                 }`}
               >
                 {item.label}
@@ -1022,11 +1025,11 @@ export default function App() {
       </header>
 
       {appMode === 'admin' && (
-        <div className="shrink-0 border-b border-[#22222c] bg-[#0f1722] px-4 py-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="shrink-0 border-b border-[#22222c] bg-[#0e1b20] px-4 py-3">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300">Admin controls</p>
-              <p className="mt-1 text-sm font-semibold text-white">Simulate trading outcomes for demos and review flows</p>
+              <p className="mt-1 text-sm font-semibold text-white">Simulate trading outcomes and validate the app flow in a controlled workspace</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => addSimulatedTrade('win')} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#061713] hover:bg-emerald-400">Fake win +$30</button>
@@ -1038,14 +1041,14 @@ export default function App() {
         </div>
       )}
 
-      <nav className="md:hidden border-b border-[#2a2a36] bg-[#121217]/95 px-2 py-2">
-        <div className="flex gap-1 overflow-x-auto pb-1">
+      <nav className="border-b border-[#212833] bg-[#0f141b]/95 px-2 py-2 md:hidden">
+        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto pb-1">
           {navigationItems.map((item) => (
             <button
               key={item.id}
               onClick={() => handleNavigation(item.id)}
-              className={`min-w-[92px] rounded-xl px-2 py-2 text-[9px] font-bold leading-tight transition-all cursor-pointer whitespace-nowrap ${
-                currentTab === item.id ? 'bg-teal-400 text-[#071217]' : 'text-gray-400 hover:bg-[#1a1a24] hover:text-white'
+              className={`min-w-[90px] rounded-xl px-2 py-2 text-[9px] font-black uppercase tracking-[0.08em] leading-tight transition-all ${
+                currentTab === item.id ? 'bg-gradient-to-r from-teal-400 to-cyan-400 text-[#071217] shadow-[0_0_18px_rgba(45,212,191,0.22)]' : 'bg-[#121a23] text-slate-300 hover:bg-[#18232d] hover:text-white'
               }`}
             >
               {item.label}
@@ -1058,34 +1061,34 @@ export default function App() {
       {currentTab === 'manual-trading' && (
         <div className="flex flex-1 flex-col overflow-hidden pb-16 md:flex-row md:overflow-hidden md:pb-0">
           <main className="flex-none min-w-0 flex flex-col bg-[#16161c] md:flex-1 md:overflow-y-auto p-2 pb-24 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
-            <div className="flex items-center justify-between bg-[#1b1b24] px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl border border-[#262633] shadow-md shrink-0">
-              <div className="flex items-center space-x-3">
-                <span className={`w-3 h-3 rounded-full ${marketStatus.includes('Live') ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                <div>
+            <div className="flex shrink-0 items-center justify-between rounded-2xl border border-[#202a35] bg-[#111b22] px-3 py-2.5 sm:px-4 sm:py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${marketStatus.includes('Live') ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]' : 'bg-amber-400'}`} />
+                <div className="min-w-0">
                   <select
                     value={selectedSymbol}
-                    onChange={(e) => {
-                      setSelectedSymbol(e.target.value);
-                    }}
-                    className="bg-transparent font-extrabold text-white text-sm outline-none cursor-pointer"
+                    onChange={(e) => setSelectedSymbol(e.target.value)}
+                    className="w-full max-w-[210px] bg-transparent text-sm font-extrabold text-white outline-none sm:text-base"
                   >
                     {liveMarkets.map((market) => (
-                      <option key={market.id} value={market.id} className="bg-[#1b1b24] text-white">
+                      <option key={market.id} value={market.id} className="bg-[#111b22] text-white">
                         {market.name}
                       </option>
                     ))}
                   </select>
-                  <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-                    {currentTick !== null ? currentTick : 'Waiting for ticks...'} 
-                    <span className="text-emerald-400 ml-2 font-semibold">({totalTicks} ticks analyzed)</span>
+                  <div className="mt-1 text-[10px] font-mono text-slate-400 sm:text-[11px]">
+                    {currentTick !== null ? currentTick : 'Waiting for ticks...'}
+                    <span className="ml-2 font-semibold text-emerald-300">({totalTicks} ticks)</span>
                   </div>
                 </div>
               </div>
-              <div className="text-xs text-gray-400">Status: <span className="text-white font-semibold">{marketStatus}</span></div>
+              <div className="rounded-full border border-[#2a3945] bg-[#0f1720] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-300">
+                {marketStatus}
+              </div>
             </div>
 
-            <div className="flex-none min-h-[160px] items-center justify-start bg-[#1b1b24]/40 border border-[#262633] rounded-2xl p-2 pt-3 sm:p-8 md:flex md:flex-1 md:min-h-0 md:justify-center md:pt-8 relative shadow-inner">
-              <div className="grid grid-cols-5 gap-1 sm:gap-2 md:gap-6 max-w-2xl w-full justify-items-center">
+            <div className="relative flex min-h-[160px] flex-none items-center justify-center rounded-[28px] border border-[#202a35] bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.10),_transparent_40%),linear-gradient(180deg,#151d24_0%,#10171d_100%)] p-3 sm:p-6 md:min-h-0 md:flex-1">
+              <div className="grid w-full max-w-2xl grid-cols-5 gap-1.5 sm:gap-2 md:gap-3">
                 {digitStats.map((item) => {
                   const isSelected = selectedDigit === item.digit;
                   const isCurrent = lastDigit === item.digit;
@@ -1094,32 +1097,30 @@ export default function App() {
                   const radius = 30;
                   const circumference = 2 * Math.PI * radius;
                   const strokeDashoffset = circumference - (item.pct / 100) * circumference;
-                  const ringColor = isLowest ? '#ef4444' : (isSelected ? '#2dd4bf' : '#38bdf8');
+                  const ringColor = isLowest ? '#f87171' : isSelected ? '#2dd4bf' : '#38bdf8';
 
                   return (
                     <button
                       key={item.digit}
                       onClick={() => setSelectedDigit(item.digit)}
-                      className={`relative w-[clamp(2.2rem,12vw,4.5rem)] h-[clamp(2.2rem,12vw,4.5rem)] rounded-full flex flex-col items-center justify-center transition-all cursor-pointer border ${
-                        isSelected ? 'border-2 border-teal-300 bg-[#1d1d2b] shadow-[0_0_0_3px_rgba(45,212,191,0.42)]' : 'border border-[#2a2a36] bg-[#1b1b24] hover:border-gray-500'
+                      className={`relative flex h-[clamp(2.4rem,12vw,4.5rem)] w-[clamp(2.4rem,12vw,4.5rem)] cursor-pointer flex-col items-center justify-center rounded-full border transition-all ${
+                        isSelected ? 'border-2 border-teal-300 bg-[#11252b] shadow-[0_0_0_3px_rgba(45,212,191,0.28)]' : 'border border-[#2c3943] bg-[#111b22] hover:border-slate-400'
                       }`}
                     >
-                      {isSelected && <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)] z-20" />}
-                      <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 80 80">
-                        <circle cx="40" cy="40" r={radius} stroke="#262633" strokeWidth="3" fill="transparent" />
+                      {isSelected && <span className="absolute right-1 top-1 z-20 h-2 w-2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]" />}
+                      <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r={radius} stroke="#1b2b34" strokeWidth="3" fill="transparent" />
                         <circle
                           cx="40" cy="40" r={radius} stroke={ringColor} strokeWidth="3"
                           strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
                           strokeLinecap="round" fill="transparent" className="transition-all duration-500"
                         />
                       </svg>
-                      <span className="text-base font-bold font-mono text-white z-10 sm:text-xl">{item.digit}</span>
-                      <span className={`text-[8px] font-semibold mt-0.5 z-10 ${isLowest ? 'text-rose-400' : 'text-gray-400'}`}>
+                      <span className="relative z-10 text-base font-black text-white sm:text-xl">{item.digit}</span>
+                      <span className={`relative z-10 text-[8px] font-bold ${isLowest ? 'text-rose-300' : 'text-slate-400'}`}>
                         {item.pct}%
                       </span>
-                      {isCurrent && (
-                        <span className="absolute -bottom-1.5 w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_10px_rgba(45,212,191,0.8)] z-20"></span>
-                      )}
+                      {isCurrent && <span className="absolute -bottom-1.5 z-20 h-2.5 w-2.5 rounded-full bg-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.8)]" />}
                     </button>
                   );
                 })}
@@ -1127,33 +1128,33 @@ export default function App() {
             </div>
           </main>
 
-          <aside className="w-full sm:w-80 bg-[#121217] border-t sm:border-t-0 sm:border-l border-[#22222c] flex flex-col h-auto text-white p-2.5 pb-24 sm:h-full sm:p-5 sm:pb-5 justify-between shrink-0 gap-2 sm:gap-0">
-            <div className="space-y-2 sm:space-y-4">
-              <div className="flex items-center justify-between border-b border-[#22222c] pb-1.5 text-[10px] font-bold uppercase text-gray-400 sm:pb-2 sm:text-xs">
-                <select value={tradeMode} onChange={(event) => setTradeMode(event.target.value as TradeMode)} className="max-w-[70%] bg-transparent text-[10px] font-bold uppercase text-gray-300 outline-none sm:text-xs">
-                  {TRADE_MODES.map((mode) => <option key={mode.id} value={mode.id} className="bg-[#17171f]">{mode.label}</option>)}
+          <aside className="flex h-auto w-full shrink-0 flex-col justify-between gap-2 border-t border-[#22222c] bg-[#10161d] p-2.5 pb-24 text-white sm:w-80 sm:border-l sm:border-t-0 sm:p-4 sm:pb-5">
+            <div className="space-y-2.5 sm:space-y-3">
+              <div className="flex items-center justify-between border-b border-[#1d2a33] pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[11px]">
+                <select value={tradeMode} onChange={(event) => setTradeMode(event.target.value as TradeMode)} className="max-w-[70%] bg-transparent text-slate-200 outline-none">
+                  {TRADE_MODES.map((mode) => <option key={mode.id} value={mode.id} className="bg-[#111b22] text-white">{mode.label}</option>)}
                 </select>
-                {isDigitMode && <span className="text-teal-400 font-mono">Barrier: {selectedDigit}</span>}
+                {isDigitMode && <span className="font-mono text-teal-300">Barrier {selectedDigit}</span>}
               </div>
 
-              <div className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2 sm:p-2.5">
-                <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.12em] text-gray-400 sm:text-[10px]">
+              <div className="rounded-2xl border border-[#1d2a33] bg-[#111b22] p-2.5 sm:p-3">
+                <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.12em] text-slate-400 sm:text-[10px]">
                   <span>Execution</span>
                   <span className="font-bold text-teal-300">{executionMode === 'single' ? 'Single' : 'Cycle'}</span>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[9px] font-bold sm:text-[10px]">
-                  <button type="button" onClick={() => setExecutionMode('single')} className={`rounded-lg px-2 py-1.5 sm:py-2 ${executionMode === 'single' ? 'bg-teal-500 text-black' : 'bg-[#252533] text-gray-300'}`}>One at a time</button>
-                  <button type="button" onClick={() => setExecutionMode('multiple')} className={`rounded-lg px-2 py-1.5 sm:py-2 ${executionMode === 'multiple' ? 'bg-cyan-500 text-black' : 'bg-[#252533] text-gray-300'}`}>Multi trade</button>
+                  <button type="button" onClick={() => setExecutionMode('single')} className={`rounded-xl px-2 py-2 ${executionMode === 'single' ? 'bg-gradient-to-r from-teal-400 to-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(45,212,191,0.2)]' : 'bg-[#18232d] text-slate-300'}`}>One at a time</button>
+                  <button type="button" onClick={() => setExecutionMode('multiple')} className={`rounded-xl px-2 py-2 ${executionMode === 'multiple' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950' : 'bg-[#18232d] text-slate-300'}`}>Multi trade</button>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-[9px] text-gray-300 sm:text-[10px]">
-                  <label className="rounded-lg border border-[#30313d] bg-[#151821] p-2">
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[9px] text-slate-300 sm:text-[10px]">
+                  <label className="rounded-xl border border-[#263642] bg-[#0f1720] p-2">
                     <span className="flex items-center justify-between">
                       <span>TP</span>
                       <input type="checkbox" checked={takeProfitEnabled} onChange={(event) => setTakeProfitEnabled(event.target.checked)} className="accent-teal-400" />
                     </span>
                     <input type="number" value={takeProfitTarget} onChange={(event) => setTakeProfitTarget(Number(event.target.value) || 0)} className="mt-2 w-full bg-transparent text-sm font-bold text-white outline-none" />
                   </label>
-                  <label className="rounded-lg border border-[#30313d] bg-[#151821] p-2">
+                  <label className="rounded-xl border border-[#263642] bg-[#0f1720] p-2">
                     <span className="flex items-center justify-between">
                       <span>SL</span>
                       <input type="checkbox" checked={stopLossEnabled} onChange={(event) => setStopLossEnabled(event.target.checked)} className="accent-rose-400" />
@@ -1161,47 +1162,68 @@ export default function App() {
                     <input type="number" value={Math.abs(stopLossLimit)} onChange={(event) => setStopLossLimit(-(Number(event.target.value) || 0))} className="mt-2 w-full bg-transparent text-sm font-bold text-white outline-none" />
                   </label>
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-[#30313d] bg-[#151821] p-2 text-[9px] text-gray-400 sm:text-[10px]">
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[#263642] bg-[#0f1720] p-2 text-[9px] text-slate-400 sm:text-[10px]">
                   <span>Cycle max</span>
                   <input type="number" min="1" max="10" value={maxTradesPerCycle} onChange={(event) => setMaxTradesPerCycle(Math.min(10, Math.max(1, Number(event.target.value) || 1)))} className="w-10 bg-transparent text-right text-sm font-bold text-white outline-none sm:w-12" />
                 </div>
               </div>
 
               {isDigitMode ? (
-                <div className="grid grid-cols-5 gap-1 bg-[#1b1b24] p-2 rounded-xl border border-[#262633]">
+                <div className="grid grid-cols-5 gap-1.5 rounded-2xl border border-[#1d2a33] bg-[#111b22] p-2">
                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
                     <button
                       key={d}
                       onClick={() => setSelectedDigit(d)}
-                      className={`py-1 text-[10px] font-bold rounded-lg transition-colors cursor-pointer ${selectedDigit === d ? 'bg-white text-black font-extrabold ring-2 ring-teal-400 ring-offset-1 ring-offset-[#1b1b24]' : 'text-gray-400 hover:text-white hover:bg-[#252533]'}`}
+                      className={`rounded-xl py-2 text-[10px] font-black transition-all ${selectedDigit === d ? 'bg-white text-slate-950 shadow-[0_0_0_2px_rgba(45,212,191,0.4)]' : 'bg-[#18232d] text-slate-300 hover:bg-[#202f3a]'}`}
                     >
                       {d}
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2 text-center text-[9px] text-gray-400 sm:p-3 sm:text-[10px]">Choose a direction below to place this contract.</div>
+                <div className="rounded-2xl border border-[#1d2a33] bg-[#111b22] p-3 text-center text-[9px] text-slate-400 sm:text-[10px]">Choose a direction below to place this contract.</div>
               )}
+
               <div className="grid grid-cols-2 gap-2">
-                <label className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2 text-center text-[9px] uppercase text-gray-500 sm:text-[10px]">Ticks
-                  <span className="mt-1 flex items-center justify-between text-sm font-bold text-white"><button type="button" onClick={() => setTicksCount((value) => Math.max(1, value - 1))} className="rounded-lg bg-[#252533] px-2 py-1 text-gray-300">-</button><span>{ticksCount}</span><button type="button" onClick={() => setTicksCount((value) => value + 1)} className="rounded-lg bg-[#252533] px-2 py-1 text-gray-300">+</button></span>
+                <label className="rounded-2xl border border-[#1d2a33] bg-[#111b22] p-2 text-center text-[9px] uppercase text-slate-500 sm:text-[10px]">
+                  Ticks
+                  <span className="mt-1 flex items-center justify-between text-sm font-black text-white">
+                    <button type="button" onClick={() => setTicksCount((value) => Math.max(1, value - 1))} className="rounded-lg bg-[#1c2b34] px-2 py-1 text-slate-200">-</button>
+                    <span>{ticksCount}</span>
+                    <button type="button" onClick={() => setTicksCount((value) => value + 1)} className="rounded-lg bg-[#1c2b34] px-2 py-1 text-slate-200">+</button>
+                  </span>
                 </label>
-                <label className="rounded-xl border border-[#262633] bg-[#1b1b24] p-2 text-center text-[9px] uppercase text-gray-500 sm:text-[10px]">Stake
-                  <input type="number" min="0.35" step="0.01" value={stake} onChange={(event) => setStake(Number(event.target.value))} className="mt-1 w-full bg-transparent text-center text-sm font-bold text-white outline-none" />
+                <label className="rounded-2xl border border-[#1d2a33] bg-[#111b22] p-2 text-center text-[9px] uppercase text-slate-500 sm:text-[10px]">
+                  Stake
+                  <input type="number" min="0.35" step="0.01" value={stake} onChange={(event) => setStake(Number(event.target.value))} className="mt-1 w-full bg-transparent text-center text-sm font-black text-white outline-none" />
                 </label>
               </div>
             </div>
-            <div className="rounded-xl border border-[#22222c] bg-[#17171f] px-3 py-2 text-[9px] font-bold text-gray-300 sm:text-[10px]">
-              <span className="text-gray-500">Auto-stop:</span> {autoStopStatus}
+
+            <div className="rounded-2xl border border-[#1d2a33] bg-[#111b22] px-3 py-2 text-[9px] font-bold text-slate-300 sm:text-[10px]">
+              <span className="text-slate-500">Auto-stop:</span> {autoStopStatus}
             </div>
-            <div className="grid grid-cols-2 gap-2 pt-2 sm:gap-3 sm:pt-4 border-t border-[#22222c]">
-              {tradeButtons.map((button, index) => <button key={button.type} onClick={() => handlePurchase(button.type)} className={`py-2 px-2 rounded-xl text-center font-bold cursor-pointer ${index === 0 ? 'bg-teal-500 text-black' : 'bg-rose-600 text-white'}`}><span className="block text-[10px] sm:text-xs">{button.label}</span><span className="mt-1 block text-[9px] font-semibold opacity-80 sm:text-[10px]">Payout: {proposalPayouts[button.type] === null || proposalPayouts[button.type] === undefined ? '--' : `${proposalPayouts[button.type]?.toFixed(2)} USD`}</span></button>)}
+
+            <div className="grid grid-cols-2 gap-2 border-t border-[#1d2a33] pt-2 sm:gap-3 sm:pt-3">
+              {tradeButtons.map((button, index) => (
+                <button
+                  key={button.type}
+                  onClick={() => handlePurchase(button.type)}
+                  className={`rounded-2xl px-2 py-2.5 text-center font-black transition hover:brightness-110 ${index === 0 ? 'bg-gradient-to-r from-teal-400 to-cyan-400 text-slate-950' : 'bg-gradient-to-r from-rose-500 to-red-600 text-white'}`}
+                >
+                  <span className="block text-[10px] sm:text-xs">{button.label}</span>
+                  <span className="mt-1 block text-[9px] font-semibold opacity-80 sm:text-[10px]">
+                    Payout: {proposalPayouts[button.type] === null || proposalPayouts[button.type] === undefined ? '--' : `${proposalPayouts[button.type]?.toFixed(2)} USD`}
+                  </span>
+                </button>
+              ))}
             </div>
-            <div className="mt-3 space-y-1.5 rounded-xl border border-[#22222c] bg-[#181820] p-3 text-[11px] sm:hidden">
-              <div className="flex items-center justify-between"><span className="text-gray-500">Market</span><span className="font-semibold text-gray-200">{liveMarkets.find((market) => market.id === selectedSymbol)?.name ?? selectedSymbol}</span></div>
-              <div className="flex items-center justify-between"><span className="text-gray-500">Contract</span><span className="font-semibold text-gray-200">{TRADE_MODES.find((mode) => mode.id === tradeMode)?.label}{isDigitMode ? ` · Digit ${selectedDigit}` : ''}</span></div>
-              <div className="flex items-center justify-between"><span className="text-gray-500">Ticks</span><span className="font-semibold text-gray-200">{ticksCount}</span></div>
-              <div className="flex items-center justify-between"><span className="text-gray-500">Stake at risk</span><span className="font-semibold text-white">{stake.toFixed(2)} USD</span></div>
+
+            <div className="mt-2 space-y-1.5 rounded-2xl border border-[#1d2a33] bg-[#0f1720] p-3 text-[11px] sm:hidden">
+              <div className="flex items-center justify-between"><span className="text-slate-500">Market</span><span className="font-semibold text-slate-200">{liveMarkets.find((market) => market.id === selectedSymbol)?.name ?? selectedSymbol}</span></div>
+              <div className="flex items-center justify-between"><span className="text-slate-500">Contract</span><span className="font-semibold text-slate-200">{TRADE_MODES.find((mode) => mode.id === tradeMode)?.label}{isDigitMode ? ` · Digit ${selectedDigit}` : ''}</span></div>
+              <div className="flex items-center justify-between"><span className="text-slate-500">Ticks</span><span className="font-semibold text-slate-200">{ticksCount}</span></div>
+              <div className="flex items-center justify-between"><span className="text-slate-500">Stake at risk</span><span className="font-semibold text-white">{stake.toFixed(2)} USD</span></div>
             </div>
           </aside>
         </div>
