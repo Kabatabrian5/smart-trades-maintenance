@@ -211,6 +211,8 @@ function playTradeSound(result: 'won' | 'lost') {
 export default function App() {
   const [isBooting, setIsBooting] = useState(true);
   const [isLightTheme, setIsLightTheme] = useState(false);
+  const [appMode, setAppMode] = useState<'client' | 'admin'>('client');
+  const [adminUnlocked, setAdminUnlocked] = useState<boolean>(() => sessionStorage.getItem('smart-trades-admin-unlocked') === 'true');
   const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots' | 'copy-trading'>('manual-trading');
   const [isCashierOpen, setIsCashierOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -407,6 +409,33 @@ export default function App() {
     }
   };
 
+  const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || 'ben2026').trim();
+
+  function requestAdminAccess() {
+    if (adminUnlocked) {
+      setAppMode('admin');
+      return;
+    }
+
+    const password = window.prompt('Enter admin password');
+    if (!password) return;
+
+    if (password === ADMIN_PASSWORD) {
+      setAdminUnlocked(true);
+      sessionStorage.setItem('smart-trades-admin-unlocked', 'true');
+      setAppMode('admin');
+      return;
+    }
+
+    window.alert('Incorrect admin password');
+  }
+
+  function lockAdminAccess() {
+    setAdminUnlocked(false);
+    sessionStorage.removeItem('smart-trades-admin-unlocked');
+    setAppMode('client');
+  }
+
   // Trading state
   const [selectedSymbol, setSelectedSymbol] = useState('1HZ100V');
   const [liveMarkets, setLiveMarkets] = useState(VOLATILITY_MARKETS);
@@ -425,6 +454,7 @@ export default function App() {
     const savedPositions = sessionStorage.getItem('smart-trades-positions');
     return savedPositions ? JSON.parse(savedPositions) as Position[] : [];
   });
+  const [positionsPanelTab, setPositionsPanelTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
   const [signalMarket, setSignalMarket] = useState('1HZ100V');
   const [signalDigitStats, setSignalDigitStats] = useState(digitStatsPlaceholder());
   const [isSearchingSignals, setIsSearchingSignals] = useState(false);
@@ -540,7 +570,6 @@ export default function App() {
     '1-3-2-6',
   ];
 
-  const [positionsPanelTab, setPositionsPanelTab] = useState<'summary' | 'transactions' | 'journal'>('summary');
   const [journalPeriod, setJournalPeriod] = useState<'today' | 'yesterday' | 'all'>('today');
 
   const totalTicks = Math.max(1, digitHistory.length);
@@ -905,6 +934,38 @@ export default function App() {
   const journalWon = journalPositions.filter((position) => position.result === 'won').length;
   const journalLost = journalPositions.filter((position) => position.result === 'lost').length;
 
+  function addSimulatedTrade(mode: 'win' | 'loss' | 'profit') {
+    const amountMap = {
+      win: { stake: 10, payout: 32, profit: 30, label: 'Win' },
+      loss: { stake: 10, payout: 0, profit: -20, label: 'Loss' },
+      profit: { stake: 10, payout: 42, profit: 44, label: 'Profit' },
+    } as const;
+
+    const selected = amountMap[mode];
+    const simulated: Position = {
+      id: `admin-${Date.now()}`,
+      symbol: selectedSymbol,
+      contract: tradeMode,
+      stake: selected.stake,
+      duration: ticksCount,
+      contractValue: selected.stake,
+      payout: selected.payout,
+      profit: selected.profit,
+      createdAt: Date.now(),
+      status: 'Settled',
+      result: mode === 'loss' ? 'lost' : 'won',
+      lastDigit: selectedDigit,
+    };
+
+    setPositions((current) => {
+      const next = [simulated, ...current];
+      sessionStorage.setItem('smart-trades-positions', JSON.stringify(next));
+      return next;
+    });
+    setPositionsPanelTab('summary');
+    setCurrentTab('positions');
+  }
+
   return (
     <div className={`${isLightTheme ? 'theme-light' : ''} flex flex-col h-screen w-screen overflow-hidden bg-[#16161c] text-white font-sans relative`}>
       {isBooting && <div className="platform-boot" role="status" aria-live="polite"><div className="platform-boot__scan" /><div className="platform-boot__logo"><img src="/favicon.svg" alt="" /><span>Smartest Trades</span></div><div className="platform-boot__network" aria-hidden="true"><i /><i /><i /><i /><i /><b /></div><p className="platform-boot__name">Smart trades</p><p className="platform-boot__status">AI powered bots</p><div className="platform-boot__line"><span /></div><p className="platform-boot__readout">Optimizing execution logic...</p></div>}
@@ -930,6 +991,22 @@ export default function App() {
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <div className="flex rounded-xl border border-slate-700 bg-[#17171f] p-1">
+            <button
+              type="button"
+              onClick={() => setAppMode('client')}
+              className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition ${appMode === 'client' ? 'bg-teal-500 text-[#071217]' : 'text-gray-400 hover:text-white'}`}
+            >
+              Client
+            </button>
+            <button
+              type="button"
+              onClick={requestAdminAccess}
+              className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition ${appMode === 'admin' ? 'bg-rose-500 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              {adminUnlocked ? 'Admin' : 'Admin 🔒'}
+            </button>
+          </div>
           {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
           <button onClick={() => setIsLightTheme((theme) => !theme)} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">{isLightTheme ? '🌙' : '☀️'} <span className="hidden sm:inline">{isLightTheme ? 'Dark' : 'Light'}</span></button>
           {account && (
@@ -941,9 +1018,35 @@ export default function App() {
               Cashier
             </button>
           )}
+          {appMode === 'admin' && (
+            <button
+              type="button"
+              onClick={lockAdminAccess}
+              className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-2.5 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/20 sm:px-3 sm:text-xs"
+            >
+              Lock admin
+            </button>
+          )}
           {account ? <div className="relative"><button title={`${activeAccountType === 'real' ? 'Real' : 'Demo'} account ${account.loginid}`} onClick={() => setIsAccountMenuOpen((open) => !open)} className="max-w-[126px] truncate rounded-xl border border-emerald-500/30 px-2 py-2 text-[10px] font-bold text-emerald-300 sm:max-w-none sm:px-3 sm:text-xs">{activeAccountType === 'real' ? 'Real' : 'Demo'} | {activeBalance === null ? '--' : activeBalance.toFixed(2)} {account.currency}</button>{isAccountMenuOpen && <div className="absolute right-0 top-12 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; const optionStatus = option.status.toLowerCase(); const unavailable = ['closed', 'disabled', 'suspended', 'inactive'].includes(optionStatus); return <button key={option.account_id} disabled={isActive || unavailable} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive || unavailable ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}<button onClick={handleLogout} className="mt-3 w-full rounded-lg border border-rose-500/40 px-2 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/10">Log out</button></div>}</div> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/20">Connect Deriv</button>}
         </div>
       </header>
+
+      {appMode === 'admin' && (
+        <div className="shrink-0 border-b border-[#22222c] bg-[#0f1722] px-4 py-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300">Admin controls</p>
+              <p className="mt-1 text-sm font-semibold text-white">Simulate trading outcomes for demos and review flows</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => addSimulatedTrade('win')} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#061713] hover:bg-emerald-400">Fake win +$30</button>
+              <button onClick={() => addSimulatedTrade('loss')} className="rounded-xl bg-rose-500 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-rose-400">Fake loss -$20</button>
+              <button onClick={() => addSimulatedTrade('profit')} className="rounded-xl bg-cyan-500 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#071217] hover:bg-cyan-400">Fake profit +$44</button>
+              <button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="rounded-xl border border-slate-700 bg-[#17171f] px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-gray-200 hover:border-slate-500">Reset demo</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex h-14 min-h-14 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
         {navigationItems.map((item) => (
