@@ -1038,7 +1038,7 @@ export default function App() {
         </div>
       )}
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex h-14 min-h-14 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex h-14 min-h-14 items-stretch gap-1 overflow-x-auto border-t border-[#2a2a36] bg-[#121217]/95 px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur shadow-[0_-8px_24px_rgba(0,0,0,0.28)]">
         {navigationItems.map((item) => (
           <button
             key={item.id}
@@ -1675,18 +1675,18 @@ export default function App() {
         </div>
       )}
 
-      <footer className="border-t border-[#22222c] bg-[#0f1016] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]" />
-            <span>{currentDateTime.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+      <footer className="shrink-0 border-t border-[#22222c] bg-[#0f1016] px-3 py-2 text-[8px] font-semibold uppercase tracking-[0.14em] text-gray-400 sm:px-4 sm:py-3 sm:text-[10px]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)] sm:h-2.5 sm:w-2.5" />
+            <span className="truncate">{currentDateTime.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
             <span className="hidden sm:inline">•</span>
-            <span>{currentDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            <span className="hidden xs:inline">{currentDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
           </div>
           <button
             type="button"
             onClick={toggleBrianAdmin}
-            className="cursor-pointer text-teal-300 transition hover:text-teal-200"
+            className="cursor-pointer truncate text-teal-300 transition hover:text-teal-200"
             aria-label={appMode === 'admin' ? 'Return to client mode' : 'Open admin mode'}
           >
             {appMode === 'admin' ? 'Back to client' : 'Developed by Brian'}
