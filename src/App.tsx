@@ -213,6 +213,9 @@ export default function App() {
   const [isLightTheme, setIsLightTheme] = useState(false);
   const [appMode, setAppMode] = useState<'client' | 'admin'>('client');
   const [adminUnlocked, setAdminUnlocked] = useState<boolean>(() => sessionStorage.getItem('smart-trades-admin-unlocked') === 'true');
+  const [isAdminAccessOpen, setIsAdminAccessOpen] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminPasswordError, setAdminPasswordError] = useState('');
   const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots' | 'copy-trading'>('manual-trading');
   const [isCashierOpen, setIsCashierOpen] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
@@ -423,17 +426,23 @@ export default function App() {
       return;
     }
 
-    const password = window.prompt('Enter admin password');
-    if (!password) return;
+    setAdminPasswordInput('');
+    setAdminPasswordError('');
+    setIsAdminAccessOpen(true);
+  }
 
-    if (password === ADMIN_PASSWORD) {
+  function submitAdminAccess(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (adminPasswordInput.trim() === ADMIN_PASSWORD) {
       setAdminUnlocked(true);
       sessionStorage.setItem('smart-trades-admin-unlocked', 'true');
       setAppMode('admin');
+      setIsAdminAccessOpen(false);
       return;
     }
 
-    window.alert('Incorrect admin password');
+    setAdminPasswordError('Incorrect password. Please try again.');
+    setAdminPasswordInput('');
   }
 
   function toggleBrianAdmin() {
@@ -449,6 +458,7 @@ export default function App() {
     setAdminUnlocked(false);
     sessionStorage.removeItem('smart-trades-admin-unlocked');
     setAppMode('client');
+    setIsAdminAccessOpen(false);
   }
 
   // Trading state
@@ -538,7 +548,6 @@ export default function App() {
   const [dashboardBots, setDashboardBots] = useState<BotItem[]>([]);
   const [selectedBotTemplate, setSelectedBotTemplate] = useState<BotTemplate | null>(null);
   const [botBuilderLoading, setBotBuilderLoading] = useState(false);
-  const [botBuilderProgress, setBotBuilderProgress] = useState(0);
   const [botBuilderLastEvent, setBotBuilderLastEvent] = useState('Ready');
   const [isBotBuilderRunning, setIsBotBuilderRunning] = useState(false);
 
@@ -596,6 +605,7 @@ export default function App() {
   const analysisStats = currentTab === 'signal' ? signalDigitStats : digitStats;
 
   const minPct = Math.min(...digitStats.map(s => s.pct));
+  const maxPct = Math.max(...digitStats.map(s => s.pct));
   const lastDigit = currentTick !== null && !isNaN(currentTick) 
     ? parseInt(currentTick.toString().slice(-1), 10) 
     : 3;
@@ -627,19 +637,7 @@ export default function App() {
     }
 
     setBotBuilderLoading(true);
-    setBotBuilderProgress(8);
     setCurrentTab('bot-builder');
-
-    const timer = window.setInterval(() => {
-      setBotBuilderProgress((current) => Math.min(current + 12, 92));
-    }, 180);
-
-    window.setTimeout(() => {
-      window.clearInterval(timer);
-      setBotBuilderProgress(100);
-      setBotBuilderLoading(false);
-      setBotBuilderLastEvent(template?.name ?? selectedStrategy ?? 'Strategy loaded');
-    }, 900);
   }
 
   function loadBotTemplate(template: BotTemplate) {
@@ -984,7 +982,7 @@ export default function App() {
   return (
     <div className={`${isLightTheme ? 'theme-light' : ''} flex flex-col h-screen w-screen overflow-hidden bg-[#16161c] text-white font-sans relative`}>
       {isBooting && <div className="platform-boot" role="status" aria-live="polite"><div className="platform-boot__scan" /><div className="platform-boot__logo"><img src="/favicon.svg" alt="" /><span>Smartest Trades</span></div><div className="platform-boot__network" aria-hidden="true"><i /><i /><i /><i /><i /><b /></div><p className="platform-boot__name">Smart trades</p><p className="platform-boot__status">AI powered bots</p><div className="platform-boot__line"><span /></div><p className="platform-boot__readout">Optimizing execution logic...</p></div>}
-      <header className="h-auto min-h-[60px] shrink-0 border-b border-[#22222c] bg-[#101319] px-3 py-2.5 sm:px-5 z-20">
+      <header className="h-auto min-h-[54px] shrink-0 border-b border-[#22222c] bg-[#101319] px-3 py-2 sm:px-5 z-20">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 via-cyan-400 to-blue-500 text-[10px] font-black text-slate-950 shadow-[0_0_20px_rgba(45,212,191,0.35)]">ST</div>
@@ -1007,20 +1005,33 @@ export default function App() {
               </button>
             ))}
           </nav>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
-          <button onClick={() => setIsLightTheme((theme) => !theme)} className="rounded-xl border border-slate-700 px-2.5 py-2 text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white sm:px-3 sm:text-xs">{isLightTheme ? '🌙' : '☀️'} <span className="hidden sm:inline">{isLightTheme ? 'Dark' : 'Light'}</span></button>
-          {account && (
-            <button
-              type="button"
-              onClick={() => setIsCashierOpen(true)}
-              className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/20 sm:px-3 sm:text-xs"
-            >
-              Cashier
-            </button>
-          )}
-          {account ? <div className="relative"><button title={`${activeAccountType === 'real' ? 'Real' : 'Demo'} account ${account.loginid}`} onClick={() => setIsAccountMenuOpen((open) => !open)} className="max-w-[126px] truncate rounded-xl border border-emerald-500/30 px-2 py-2 text-[10px] font-bold text-emerald-300 sm:max-w-none sm:px-3 sm:text-xs">{activeAccountType === 'real' ? 'Real' : 'Demo'} | {activeBalance === null ? '--' : activeBalance.toFixed(2)} {account.currency}</button>{isAccountMenuOpen && <div className="absolute right-0 top-12 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; const optionStatus = option.status.toLowerCase(); const unavailable = ['closed', 'disabled', 'suspended', 'inactive'].includes(optionStatus); return <button key={option.account_id} disabled={isActive || unavailable} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive || unavailable ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}<button onClick={handleLogout} className="mt-3 w-full rounded-lg border border-rose-500/40 px-2 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/10">Log out</button></div>}</div> : <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/20">Connect Deriv</button>}
+
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
+
+            <div className="flex items-center gap-1.5 rounded-full border border-[#2b3340] bg-[#161d27] px-1.5 py-1">
+              <button onClick={() => setIsLightTheme((theme) => !theme)} className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-[#171d25] text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white">{isLightTheme ? '☾' : '☀'}</button>
+
+              {account && (
+                <button
+                  type="button"
+                  onClick={() => setIsCashierOpen(true)}
+                  className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/20"
+                >
+                  Cashier
+                </button>
+              )}
+
+              {account ? (
+                <div className="relative">
+                  <button title={`${activeAccountType === 'real' ? 'Real' : 'Demo'} account ${account.loginid}`} onClick={() => setIsAccountMenuOpen((open) => !open)} className="max-w-[116px] truncate rounded-full border border-emerald-500/30 bg-[#12251d] px-2 py-1.5 text-[9px] font-bold text-emerald-300 sm:max-w-none">{activeAccountType === 'real' ? 'Real' : 'Demo'} | {activeBalance === null ? '--' : activeBalance.toFixed(2)} {account.currency}</button>
+                  {isAccountMenuOpen && <div className="absolute right-0 top-11 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; const optionStatus = option.status.toLowerCase(); const unavailable = ['closed', 'disabled', 'suspended', 'inactive'].includes(optionStatus); return <button key={option.account_id} disabled={isActive || unavailable} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive || unavailable ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}<button onClick={handleLogout} className="mt-3 w-full rounded-lg border border-rose-500/40 px-2 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/10">Log out</button></div>}
+                </div>
+              ) : (
+                <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/20">Connect Deriv</button>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -1060,7 +1071,7 @@ export default function App() {
       {/* Manual Trading View */}
       {currentTab === 'manual-trading' && (
         <div className="flex flex-1 flex-col overflow-hidden pb-20 md:flex-row md:overflow-hidden md:pb-0">
-          <main className="flex-none min-w-0 flex flex-col bg-[#16161c] md:flex-1 md:overflow-y-auto p-2 pb-24 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
+          <main className="min-h-0 min-w-0 flex-1 flex flex-col overflow-y-auto bg-[#16161c] p-2 pb-24 sm:p-6 sm:pb-6 space-y-2 sm:space-y-4">
             <div className="flex shrink-0 items-center justify-between rounded-2xl border border-[#202a35] bg-[#111b22] px-3 py-2.5 sm:px-4 sm:py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${marketStatus.includes('Live') ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]' : 'bg-amber-400'}`} />
@@ -1087,24 +1098,72 @@ export default function App() {
               </div>
             </div>
 
-            <div className="relative flex min-h-[160px] flex-none items-center justify-center rounded-[28px] border border-[#202a35] bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.10),_transparent_40%),linear-gradient(180deg,#151d24_0%,#10171d_100%)] p-3 sm:p-6 md:min-h-0 md:flex-1">
+            <div className="order-2 rounded-2xl border border-[#202a35] bg-[#111b22] p-2 md:order-none md:hidden">
+              <div className="flex items-center gap-2">
+                <select aria-label="Trade type" value={tradeMode} onChange={(event) => setTradeMode(event.target.value as TradeMode)} className="min-w-0 flex-1 rounded-lg border border-[#2d3743] bg-[#0f1720] px-2 py-1.5 text-[10px] font-bold text-white outline-none">
+                  {TRADE_MODES.map((mode) => <option key={mode.id} value={mode.id} className="bg-[#111b22] text-white">{mode.label}</option>)}
+                </select>
+                {isDigitMode && <span className="shrink-0 font-mono text-[9px] font-bold text-white">Barrier {selectedDigit}</span>}
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-[9px] font-bold sm:text-[10px]">
+                <button type="button" onClick={() => setExecutionMode('single')} className={`rounded-lg px-2 py-1.5 ${executionMode === 'single' ? 'bg-gradient-to-r from-teal-400 to-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(45,212,191,0.2)]' : 'bg-[#18232d] text-slate-300'}`}>One at a time</button>
+                <button type="button" onClick={() => setExecutionMode('multiple')} className={`rounded-lg px-2 py-1.5 ${executionMode === 'multiple' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950' : 'bg-[#18232d] text-slate-300'}`}>Multi trade</button>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-[9px] text-slate-300 sm:text-[10px]">
+                <label className="flex items-center justify-between gap-2 rounded-lg border border-[#263642] bg-[#0f1720] px-2 py-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <span>TP</span>
+                    <input type="checkbox" checked={takeProfitEnabled} onChange={(event) => setTakeProfitEnabled(event.target.checked)} className="accent-teal-400" />
+                  </span>
+                  <input aria-label="Take profit target" type="number" value={takeProfitTarget} onChange={(event) => setTakeProfitTarget(Number(event.target.value) || 0)} className="w-16 bg-transparent text-right text-xs font-bold text-white outline-none" />
+                </label>
+                <label className="flex items-center justify-between gap-2 rounded-lg border border-[#263642] bg-[#0f1720] px-2 py-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <span>SL</span>
+                    <input type="checkbox" checked={stopLossEnabled} onChange={(event) => setStopLossEnabled(event.target.checked)} className="accent-rose-400" />
+                  </span>
+                  <input aria-label="Stop loss limit" type="number" value={Math.abs(stopLossLimit)} onChange={(event) => setStopLossLimit(-(Number(event.target.value) || 0))} className="w-16 bg-transparent text-right text-xs font-bold text-white outline-none" />
+                </label>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-[#263642] bg-[#0f1720] px-2 py-1.5 text-[9px] text-slate-400 sm:text-[10px]">
+                <span>Stake</span>
+                <input aria-label="Stake amount" type="number" min="0.35" step="0.01" value={stake} onChange={(event) => setStake(Number(event.target.value))} className="w-20 bg-transparent text-right text-sm font-black text-white outline-none" />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {tradeButtons.map((button, index) => (
+                  <button
+                    key={button.type}
+                    onClick={() => handlePurchase(button.type)}
+                    className={`rounded-lg px-2 py-2 text-center font-black transition hover:brightness-110 ${index === 0 ? 'bg-gradient-to-r from-teal-400 to-cyan-400 text-slate-950' : 'bg-gradient-to-r from-rose-500 to-red-600 text-white'}`}
+                  >
+                    <span className="block text-[10px]">{button.label}</span>
+                    <span className="mt-0.5 block text-[8px] font-semibold opacity-80">
+                      {proposalPayouts[button.type] === null || proposalPayouts[button.type] === undefined ? '--' : `${proposalPayouts[button.type]?.toFixed(2)} USD`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative order-1 flex min-h-[160px] flex-none items-center justify-center rounded-[28px] border border-[#202a35] bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.10),_transparent_40%),linear-gradient(180deg,#151d24_0%,#10171d_100%)] p-3 sm:p-6 md:order-none md:min-h-0 md:flex-1">
               <div className="grid w-full max-w-2xl grid-cols-5 gap-1.5 sm:gap-2 md:gap-3">
                 {digitStats.map((item) => {
                   const isSelected = selectedDigit === item.digit;
                   const isCurrent = lastDigit === item.digit;
                   const isLowest = item.pct === minPct && totalTicks > 5;
+                  const isHighest = item.pct === maxPct && totalTicks > 5;
 
                   const radius = 30;
                   const circumference = 2 * Math.PI * radius;
                   const strokeDashoffset = circumference - (item.pct / 100) * circumference;
-                  const ringColor = isLowest ? '#f87171' : isSelected ? '#2dd4bf' : '#38bdf8';
+                  const ringColor = isLowest ? '#f87171' : isHighest ? '#4ade80' : isSelected ? '#ffffff' : '#38bdf8';
 
                   return (
                     <button
                       key={item.digit}
                       onClick={() => setSelectedDigit(item.digit)}
                       className={`relative flex h-[clamp(2.4rem,12vw,4.5rem)] w-[clamp(2.4rem,12vw,4.5rem)] cursor-pointer flex-col items-center justify-center rounded-full border transition-all ${
-                        isSelected ? 'border-2 border-teal-300 bg-[#11252b] shadow-[0_0_0_3px_rgba(45,212,191,0.28)]' : 'border border-[#2c3943] bg-[#111b22] hover:border-slate-400'
+                        isSelected ? 'border-2 border-white bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]' : isLowest ? 'border border-rose-400/70 bg-rose-500/20 hover:border-rose-300' : isHighest ? 'border border-emerald-400/70 bg-emerald-500/20 hover:border-emerald-300' : 'border border-[#2c3943] bg-[#111b22] hover:border-slate-400'
                       }`}
                     >
                       {isSelected && <span className="absolute right-1 top-1 z-20 h-2 w-2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]" />}
@@ -1116,8 +1175,8 @@ export default function App() {
                           strokeLinecap="round" fill="transparent" className="transition-all duration-500"
                         />
                       </svg>
-                      <span className="relative z-10 text-base font-black text-white sm:text-xl">{item.digit}</span>
-                      <span className={`relative z-10 text-[8px] font-bold ${isLowest ? 'text-rose-300' : 'text-slate-400'}`}>
+                      <span className={`relative z-10 text-base font-black sm:text-xl ${isSelected ? 'text-slate-950' : 'text-white'}`}>{item.digit}</span>
+                      <span className={`relative z-10 text-[8px] font-bold ${isSelected ? 'text-slate-700' : isLowest ? 'text-rose-300' : isHighest ? 'text-emerald-300' : 'text-slate-400'}`}>
                         {item.pct}%
                       </span>
                       {isCurrent && <span className="absolute -bottom-1.5 z-20 h-2.5 w-2.5 rounded-full bg-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.8)]" />}
@@ -1128,7 +1187,7 @@ export default function App() {
             </div>
           </main>
 
-          <aside className="flex h-auto w-full shrink-0 flex-col justify-between gap-2 border-t border-[#22222c] bg-[#10161d] p-2.5 pb-24 text-white sm:w-80 sm:border-l sm:border-t-0 sm:p-4 sm:pb-5">
+          <aside className="hidden md:flex h-auto w-full shrink-0 flex-col justify-between gap-2 border-t border-[#22222c] bg-[#10161d] p-2.5 pb-24 text-white sm:w-80 sm:border-l sm:border-t-0 sm:p-4 sm:pb-5">
             <div className="space-y-2.5 sm:space-y-3">
               <div className="flex items-center justify-between border-b border-[#1d2a33] pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 sm:text-[11px]">
                 <select value={tradeMode} onChange={(event) => setTradeMode(event.target.value as TradeMode)} className="max-w-[70%] bg-transparent text-slate-200 outline-none">
@@ -1343,7 +1402,7 @@ export default function App() {
       )}
 
       {currentTab === 'bot-builder' && (
-        <div className="flex flex-1 flex-col overflow-hidden bg-[#0b1020]">
+        <div className="relative flex flex-1 flex-col overflow-hidden bg-[#0b1020]">
           <div className="flex items-center justify-between border-b border-slate-800 bg-[#111827] px-4 py-3 text-white">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff444f] text-sm font-black text-white">D</span>
@@ -1374,35 +1433,28 @@ export default function App() {
             </div>
           </div>
           {botBuilderLoading && (
-            <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#05131a]/80 backdrop-blur-sm">
-              <div className="w-full max-w-md rounded-[28px] border border-cyan-300/40 bg-[#071a1f]/95 p-6 shadow-[0_0_36px_rgba(45,212,191,0.35)] text-cyan-100">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-xl font-black text-slate-900 shadow-lg">ST</div>
-                <p className="mt-5 text-center text-2xl font-black tracking-[0.08em] text-white">Smart trades</p>
-                <p className="mt-2 text-center text-[10px] uppercase tracking-[0.2em] text-cyan-300">AI powered bots</p>
-                <div className="mt-6 flex justify-center gap-2">
-                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.9)]" />
-                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.9)] [animation-delay:200ms]" />
-                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.9)] [animation-delay:400ms]" />
-                </div>
-                <div className="mt-6 h-2 overflow-hidden rounded-full bg-slate-800">
-                  <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-teal-300 transition-all duration-300" style={{ width: `${botBuilderProgress}%` }} />
-                </div>
-                <div className="mt-3 flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-slate-300">
-                  <span>Preparing workspace</span>
-                  <span>{botBuilderProgress}%</span>
-                </div>
-              </div>
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center overflow-hidden bg-[#07121c] px-5 text-white" role="status" aria-live="polite">
+              <div className="platform-boot__scan" />
+              <div className="platform-boot__network" aria-hidden="true"><i /><i /><i /><i /><i /><b /></div>
+              <div className="platform-boot__logo"><img src="/favicon.svg" alt="" /><span>Smartest Trades</span></div>
+              <p className="platform-boot__name mt-12">Smart trades</p>
+              <p className="platform-boot__status">AI powered bots</p>
+              <div className="platform-boot__line mt-6"><span /></div>
+              <p className="platform-boot__readout mt-2">Preparing Bot Builder...</p>
             </div>
           )}
           <iframe
             title="Deriv Bot Builder"
-            src={`/bot-builder/index.html?template=${encodeURIComponent(selectedBotTemplate?.file ?? 'deriv-default.xml')}`}
+            src={`/bot-builder/?template=${encodeURIComponent(selectedBotTemplate?.file ?? 'deriv-default.xml')}`}
             className="h-full w-full border-0 bg-white"
             allow="clipboard-write"
             onLoad={() => {
               setBotBuilderLoading(false);
-              setBotBuilderProgress(100);
-              setBotBuilderLastEvent(selectedBotTemplate?.name ?? activeStrategyConfig?.strategyName ?? 'Builder ready');
+              setBotBuilderLastEvent(selectedBotTemplate?.name ?? activeStrategyConfig?.strategyName ?? 'Workspace loaded');
+            }}
+            onError={() => {
+              setBotBuilderLoading(false);
+              setBotBuilderLastEvent('Builder failed to load');
             }}
           />
         </div>
@@ -1430,7 +1482,7 @@ export default function App() {
                       <p className="text-base font-extrabold text-white">{profile.name}</p>
                       <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-cyan-300">{profile.risk} risk</p>
                     </div>
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black uppercase text-emerald-300">{profile.profit}</span>
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-bold uppercase text-emerald-300">{profile.profit}</span>
                   </div>
                   <p className="mt-3 text-sm text-gray-400">{profile.description}</p>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-gray-300">
@@ -1699,18 +1751,38 @@ export default function App() {
         </div>
       )}
 
-      <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-[#22222c] bg-[#0f1016]/95 px-2 py-1.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-gray-400 backdrop-blur-sm md:static md:bottom-auto md:z-auto md:border-t md:bg-[#0f1016] md:px-4 md:py-3 md:text-[10px]">
+      {isAdminAccessOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setIsAdminAccessOpen(false)}>
+          <section className="w-full max-w-sm rounded-2xl border border-[#30303d] bg-[#17171f] p-5 text-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="admin-access-title" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-300">Developed by Brian</p>
+                <h2 id="admin-access-title" className="mt-2 text-xl font-extrabold">Admin access</h2>
+              </div>
+              <button type="button" onClick={() => setIsAdminAccessOpen(false)} className="text-2xl leading-none text-gray-400 hover:text-white" aria-label="Close admin access">&times;</button>
+            </div>
+            <form onSubmit={submitAdminAccess}>
+              <label htmlFor="admin-password" className="mb-2 block text-xs font-semibold text-gray-300">Password</label>
+              <input id="admin-password" type="password" autoFocus value={adminPasswordInput} onChange={(event) => { setAdminPasswordInput(event.target.value); setAdminPasswordError(''); }} className="w-full rounded-xl border border-[#38404c] bg-[#101319] px-3 py-2.5 text-sm text-white outline-none focus:border-teal-400" aria-invalid={Boolean(adminPasswordError)} aria-describedby={adminPasswordError ? 'admin-password-error' : undefined} />
+              {adminPasswordError && <p id="admin-password-error" className="mt-2 text-xs text-rose-300" role="alert">{adminPasswordError}</p>}
+              <button type="submit" className="mt-4 w-full rounded-xl bg-teal-400 px-4 py-2.5 text-sm font-bold text-[#071217] transition hover:bg-teal-300">Enter admin</button>
+            </form>
+          </section>
+        </div>
+      )}
+
+      <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700/80 bg-[#f8fafc]/95 px-2 py-1.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-slate-700 shadow-[0_-8px_18px_rgba(15,23,42,0.08)] backdrop-blur-sm md:static md:bottom-auto md:z-auto md:border-t md:bg-[#0f1016] md:px-4 md:py-3 md:text-[10px] md:text-gray-400">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-1 sm:gap-3 md:gap-3">
           <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3">
-            <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)] sm:h-2 sm:w-2 md:h-2.5 md:w-2.5" />
-            <span className="truncate">{currentDateTime.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-            <span aria-hidden="true">•</span>
-            <span className="truncate">{currentDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] sm:h-2 sm:w-2 md:h-2.5 md:w-2.5" />
+            <span className="truncate text-[8px] text-slate-700 sm:text-[9px] md:text-[10px] md:text-slate-300">{currentDateTime.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+            <span aria-hidden="true" className="text-slate-500 md:text-slate-600">•</span>
+            <span className="truncate text-[8px] text-slate-700 sm:text-[9px] md:text-[10px] md:text-slate-300">{currentDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
           </div>
           <button
             type="button"
             onClick={toggleBrianAdmin}
-            className="shrink-0 cursor-pointer truncate text-teal-300 transition hover:text-teal-200"
+            className="shrink-0 cursor-pointer truncate text-[8px] text-slate-800 transition hover:text-slate-600 sm:text-[9px] md:text-[10px] md:text-teal-300 md:hover:text-teal-200"
             aria-label={appMode === 'admin' ? 'Return to client mode' : 'Open admin mode'}
           >
             {appMode === 'admin' ? 'Back to client' : 'Developed by Brian'}

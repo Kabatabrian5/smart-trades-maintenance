@@ -3,6 +3,11 @@
     <head>
         <meta charset="UTF-8" />
         <base href="/bot-builder/" />
+        <script>
+            if (window.location.pathname === '/bot-builder/index.html') {
+                window.history.replaceState(null, '', `/bot-builder/${window.location.search}${window.location.hash}`);
+            }
+        </script>
         <link rel="icon" type="image/svg+xml" href="/bot-builder/deriv-logo.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <meta name="title" content="Smartest Trades Bot Builder" />
