@@ -51,6 +51,13 @@ npm run build
 - Users can browse markets, open positions, run scans, and use the cashier flow.
 - The app uses Deriv redirects and account selection to keep money handling on the official Deriv side rather than directly in the frontend.
 
+### Copy-trading onboarding
+
+- The Copy Trading tab connects accounts through the existing Deriv OAuth flow; users should not paste API tokens into the app.
+- The requested OAuth scopes are `trade`, `account_manage`, and `payment`. Account selection and the authenticated WebSocket session use the existing Deriv integration.
+- A connected account is displayed in the Copy Trading view. Account connection does not start trades or copy another trader.
+- Automated follower/source selection and trade replication are not implemented yet. Do not present account verification as an active copy-trading service.
+
 ### Admin view
 
 - Admin mode is not openly exposed in normal client flow.

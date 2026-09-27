@@ -267,6 +267,10 @@ export default function App() {
       const tokenResponse = await response.json() as { access_token?: string };
       if (!tokenResponse.access_token) throw new Error('Deriv returned no usable access token');
       await authorizeWithAccessToken(tokenResponse.access_token);
+      if (sessionStorage.getItem('deriv_oauth_return_tab') === 'copy-trading') {
+        setCurrentTab('copy-trading');
+        sessionStorage.removeItem('deriv_oauth_return_tab');
+      }
       sessionStorage.removeItem('deriv_pkce_verifier');
       sessionStorage.removeItem('deriv_oauth_state');
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -337,6 +341,19 @@ export default function App() {
       currency: nextAccount.currency,
     }));
     setAuthStatus('idle');
+  }
+
+  async function connectDerivAccount(returnToCopyTrading = false) {
+    setAuthStatus('authorizing');
+    setAuthError('');
+    try {
+      if (returnToCopyTrading) sessionStorage.setItem('deriv_oauth_return_tab', 'copy-trading');
+      window.location.href = await derivOAuthUrl();
+    } catch (error) {
+      sessionStorage.removeItem('deriv_oauth_return_tab');
+      setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed');
+      setAuthStatus('failed');
+    }
   }
 
   async function switchAccount(nextAccount: DerivOptionsAccount) {
@@ -1028,7 +1045,7 @@ export default function App() {
                   {isAccountMenuOpen && <div className="absolute right-0 top-11 z-40 w-64 rounded-xl border border-slate-700 bg-[#17171f] p-3 text-left shadow-2xl"><p className="px-2 text-[10px] uppercase tracking-wider text-gray-500">Switch account</p>{availableAccounts.map((option) => { const optionType = option.account_type === 'real' ? 'real' : 'demo'; const isActive = option.account_id === account.loginid; const optionStatus = option.status.toLowerCase(); const unavailable = ['closed', 'disabled', 'suspended', 'inactive'].includes(optionStatus); return <button key={option.account_id} disabled={isActive || unavailable} onClick={() => void switchAccount(option)} className={`mt-1 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-xs ${isActive || unavailable ? 'cursor-default bg-white/5 text-gray-500' : 'text-gray-200 hover:bg-white/10'}`}><span><span className="mr-2 font-bold">{optionType === 'real' ? 'Real' : 'Demo'}</span>{option.account_id}</span><span>{normalizeBalance(option.balance)?.toFixed(2) ?? '--'} {option.currency}</span></button>; })}<button onClick={handleLogout} className="mt-3 w-full rounded-lg border border-rose-500/40 px-2 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/10">Log out</button></div>}
                 </div>
               ) : (
-                <button onClick={async () => { try { window.location.href = await derivOAuthUrl(); } catch (error) { setAuthError(error instanceof Error ? error.message : 'Deriv authorization failed'); setAuthStatus('failed'); } }} className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/20">Connect Deriv</button>
+                <button onClick={() => void connectDerivAccount()} className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-500/20">Connect Deriv</button>
               )}
             </div>
           </div>
@@ -1461,38 +1478,47 @@ export default function App() {
       )}
 
       {currentTab === 'copy-trading' && (
-        <main className="flex-1 overflow-y-auto bg-[#16161c] p-4 pb-20 text-white sm:p-8 sm:pb-20 md:pb-0">
-          <div className="mx-auto max-w-5xl space-y-5">
-            <div className="flex items-end justify-between gap-3 border-b border-[#262633] pb-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-400">Copy trading</p>
-                <h1 className="mt-1 text-2xl font-extrabold">Follow proven trading profiles</h1>
+        <main className="flex-1 overflow-y-auto bg-[#f7f9fa] p-4 pb-24 text-[#17212b] sm:p-8 sm:pb-20 md:pb-8">
+          <div className="mx-auto w-full max-w-xl py-5 sm:py-8">
+            <header className="text-center">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#ff444f] text-2xl font-black text-white shadow-[0_12px_28px_rgba(255,68,79,0.22)]">D</div>
+              <h1 className="mt-4 text-2xl font-black text-[#e43c4d]">Copy trading</h1>
+              <p className="mt-1 text-sm text-slate-500">Connect a Deriv account to continue</p>
+            </header>
+
+            <details open className="group mt-7 overflow-hidden rounded-xl border border-slate-200 bg-[#f0f2f3]">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-slate-800">
+                <span>How account connection works</span>
+                <span className="text-slate-500 transition-transform group-open:rotate-180" aria-hidden="true">⌄</span>
+              </summary>
+              <div className="border-t border-slate-200 px-4 py-4 text-xs leading-5 text-slate-600">
+                <ol className="list-inside list-decimal space-y-2">
+                  <li>Continue to Deriv and sign in to your account.</li>
+                  <li>Review and approve the requested account and trading permissions.</li>
+                  <li>You will return here with your selected Deriv account connected.</li>
+                </ol>
+                <p className="mt-3 border-t border-slate-200 pt-3 text-[11px] text-slate-500">Connection uses Deriv OAuth. Do not paste or share your API token.</p>
               </div>
-              <button onClick={() => setCurrentTab('dashboard')} className="rounded-xl border border-[#30303d] bg-[#1b1b24] px-3 py-2 text-[10px] font-bold uppercase text-gray-200">Back to dashboard</button>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {[
-                { name: 'Smartest Trades Alpha', winRate: '91.4%', profit: '+18.4%', risk: 'Medium', description: 'Volatility 100 / fast recovery strategy' },
-                { name: 'Recovery Pulse', winRate: '87.9%', profit: '+12.7%', risk: 'Low', description: 'Balanced daily execution with low drawdown' },
-                { name: 'Momentum Burst', winRate: '84.6%', profit: '+14.1%', risk: 'High', description: 'High-conviction jump and burst trades' },
-              ].map((profile) => (
-                <div key={profile.name} className="rounded-2xl border border-[#262633] bg-[#1b1b24] p-5 shadow-lg shadow-black/10">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-base font-extrabold text-white">{profile.name}</p>
-                      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-cyan-300">{profile.risk} risk</p>
-                    </div>
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-bold uppercase text-emerald-300">{profile.profit}</span>
-                  </div>
-                  <p className="mt-3 text-sm text-gray-400">{profile.description}</p>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-gray-300">
-                    <div className="rounded-xl border border-[#30303d] bg-[#17171f] p-2"><span className="block text-[9px] uppercase text-gray-500">Win rate</span><strong className="mt-1 block text-sm text-white">{profile.winRate}</strong></div>
-                    <div className="rounded-xl border border-[#30303d] bg-[#17171f] p-2"><span className="block text-[9px] uppercase text-gray-500">Theme</span><strong className="mt-1 block text-sm text-white">AI scan</strong></div>
-                  </div>
-                  <button onClick={() => { setCurrentTab('manual-trading'); setSelectedSymbol('1HZ100V'); }} className="mt-4 w-full rounded-xl bg-teal-500 px-3 py-2 text-xs font-black uppercase text-[#071217] hover:bg-teal-400">Copy this setup</button>
-                </div>
-              ))}
-            </div>
+            </details>
+
+            {account ? (
+              <section className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4" role="status" aria-live="polite">
+                <p className="text-sm font-bold text-emerald-700">Deriv account connected</p>
+                <p className="mt-1 text-xs text-slate-600">{account.loginid} · {activeAccountType === 'real' ? 'Real' : 'Demo'} · {activeBalance === null ? '--' : activeBalance.toFixed(2)} {account.currency}</p>
+                <p className="mt-3 border-t border-emerald-200 pt-3 text-[11px] leading-5 text-slate-600">Your account is connected. Trade copying is not active yet; this screen does not mirror another trader’s trades.</p>
+                <button type="button" onClick={handleLogout} className="mt-3 text-xs font-bold text-rose-700 underline underline-offset-2">Disconnect account</button>
+              </section>
+            ) : (
+              <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-700">Deriv account</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Connect securely through Deriv. Your credentials stay on Deriv’s sign-in page.</p>
+                <button type="button" onClick={() => void connectDerivAccount(true)} disabled={authStatus === 'authorizing'} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-400 px-4 py-3 text-sm font-black text-[#071217] transition hover:bg-teal-300 disabled:cursor-wait disabled:opacity-60">
+                  {authStatus === 'authorizing' ? 'Connecting to Deriv...' : 'Connect Deriv account'}
+                </button>
+              </section>
+            )}
+
+            <button onClick={() => setCurrentTab('dashboard')} className="mx-auto mt-5 block px-3 py-2 text-xs font-semibold text-slate-500 transition hover:text-slate-900">Back to dashboard</button>
           </div>
         </main>
       )}
