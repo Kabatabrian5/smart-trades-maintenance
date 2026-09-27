@@ -58,6 +58,13 @@ npm run build
 - A connected account is displayed in the Copy Trading view. Account connection does not start trades or copy another trader.
 - Automated follower/source selection and trade replication are not implemented yet. Do not present account verification as an active copy-trading service.
 
+### Trading calculator
+
+- The Calculator tab models risk budget, suggested stake ceiling, estimated win profit, break-even win rate, expected value, loss-streak drawdown, compounding, account growth target, and estimated edge.
+- Account balance starts from the connected Deriv account when available; all assumptions remain editable for scenario planning.
+- `Use suggested stake in Manual Trading` copies the risk-budget stake into the manual trading stake input.
+- Calculator returns and win rates are user assumptions, not live quotes or guaranteed outcomes. Confirm contract-specific payout in the live trading view before placing a trade.
+
 ### Admin view
 
 - Admin mode is not openly exposed in normal client flow.

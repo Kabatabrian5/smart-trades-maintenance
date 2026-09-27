@@ -216,7 +216,7 @@ export default function App() {
   const [isAdminAccessOpen, setIsAdminAccessOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminPasswordError, setAdminPasswordError] = useState('');
-  const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots' | 'copy-trading'>('manual-trading');
+  const [currentTab, setCurrentTab] = useState<'manual-trading' | 'positions' | 'analysis' | 'signal' | 'dashboard' | 'bot-builder' | 'bots' | 'copy-trading' | 'trading-calculator'>('manual-trading');
   const [isCashierOpen, setIsCashierOpen] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -227,6 +227,15 @@ export default function App() {
     return savedAccount ? JSON.parse(savedAccount) as DerivAccount : null;
   });
   const [accountBalances, setAccountBalances] = useState<AccountBalances>({ real: null, demo: null, currency: 'USD' });
+  const [calculatorContract, setCalculatorContract] = useState('Rise / Fall');
+  const [calculatorBalance, setCalculatorBalance] = useState(() => normalizeBalance(account?.balance) ?? 1000);
+  const [calculatorRiskPercent, setCalculatorRiskPercent] = useState(2);
+  const [calculatorPlannedStake, setCalculatorPlannedStake] = useState(20);
+  const [calculatorReturnPercent, setCalculatorReturnPercent] = useState(95);
+  const [calculatorWinRate, setCalculatorWinRate] = useState(55);
+  const [calculatorLossStreak, setCalculatorLossStreak] = useState(3);
+  const [calculatorCompoundingPercent, setCalculatorCompoundingPercent] = useState(2);
+  const [calculatorGrowthTarget, setCalculatorGrowthTarget] = useState(10);
   const [authStatus, setAuthStatus] = useState<'idle' | 'authorizing' | 'failed'>('idle');
   const [authError, setAuthError] = useState('');
   const announcedSettlements = useRef<Set<string>>(new Set());
@@ -422,6 +431,7 @@ export default function App() {
     { id: 'manual-trading' as const, label: 'Manual trading' },
     { id: 'positions' as const, label: 'Positions' },
     { id: 'signal' as const, label: 'Signal' },
+    { id: 'trading-calculator' as const, label: 'Calculator' },
     { id: 'dashboard' as const, label: 'Dashboard' },
     { id: 'bot-builder' as const, label: 'Bot Builder' },
     { id: 'copy-trading' as const, label: 'Copy trading' },
@@ -429,7 +439,7 @@ export default function App() {
   ] as const;
 
   const handleNavigation = (id: (typeof navigationItems)[number]['id']) => {
-    if (id === 'manual-trading' || id === 'positions' || id === 'signal' || id === 'dashboard' || id === 'bot-builder' || id === 'copy-trading' || id === 'bots') {
+    if (id === 'manual-trading' || id === 'positions' || id === 'signal' || id === 'dashboard' || id === 'bot-builder' || id === 'copy-trading' || id === 'bots' || id === 'trading-calculator') {
       setCurrentTab(id);
       return;
     }
@@ -939,6 +949,21 @@ export default function App() {
 
   const activeAccountType = account ? getAccountType(account) : null;
   const activeBalance = account ? account.balance ?? accountBalances[activeAccountType || 'real'] : null;
+  useEffect(() => {
+    if (activeBalance !== null) setCalculatorBalance(activeBalance);
+  }, [account?.loginid]);
+
+  const calculatorRiskBudget = calculatorBalance * calculatorRiskPercent / 100;
+  const calculatorSuggestedStake = calculatorRiskBudget;
+  const calculatorWinProfit = calculatorPlannedStake * calculatorReturnPercent / 100;
+  const calculatorBreakEvenRate = calculatorReturnPercent > 0 ? 100 / (1 + calculatorReturnPercent / 100) : 100;
+  const calculatorWinProbability = calculatorWinRate / 100;
+  const calculatorExpectedValue = calculatorWinProbability * calculatorWinProfit - (1 - calculatorWinProbability) * calculatorPlannedStake;
+  const calculatorDrawdown = calculatorPlannedStake * (2 ** calculatorLossStreak - 1);
+  const calculatorNextStake = calculatorPlannedStake * (1 + calculatorCompoundingPercent / 100);
+  const calculatorGrowthAmount = calculatorBalance * calculatorGrowthTarget / 100;
+  const calculatorStakeRatio = calculatorBalance > 0 ? calculatorPlannedStake / calculatorBalance * 100 : 0;
+  const calculatorEdge = calculatorPlannedStake > 0 ? calculatorExpectedValue / calculatorPlannedStake * 100 : 0;
   const settledPositions = positions.filter((position) => position.status === 'Settled');
   const totalStake = positions.reduce((total, position) => total + position.stake, 0);
   const totalPayout = settledPositions.reduce((total, position) => total + (position.payout ?? 0), 0);
@@ -1395,6 +1420,102 @@ export default function App() {
             </div>
             {currentTab === 'signal' && <div className="grid gap-3 sm:grid-cols-2">{TRADE_MODES.map((mode) => { const even = analysisStats.filter((item) => item.digit % 2 === 0).reduce((sum, item) => sum + item.pct, 0); const over = analysisStats.filter((item) => item.digit > 5).reduce((sum, item) => sum + item.pct, 0); const common = analysisStats.reduce((best, item) => item.count > best.count ? item : best, analysisStats[0]).digit; const suggestion = mode.id === 'EVEN_ODD' ? (even >= 50 ? 'Even' : 'Odd') : mode.id === 'OVER_UNDER' ? (over >= 50 ? 'Over 5' : 'Under 5') : mode.id === 'MATCHES_DIFFERS' ? `Match ${common}` : mode.label.split(' / ')[0]; return <div key={mode.id} className="flex items-center justify-between rounded-xl border border-[#262633] bg-[#1b1b24] p-4"><div><p className="text-xs text-gray-500">{mode.label}</p><p className="mt-1 font-bold text-white">{suggestion}</p></div><span className="rounded-lg bg-teal-400/10 px-2 py-1 text-[10px] font-bold uppercase text-teal-300">1 hour</span></div>; })}</div>}
             <div className="rounded-2xl border border-teal-500/30 bg-teal-500/5 p-5"><p className="text-xs uppercase tracking-wider text-teal-400">Statistical context</p><p className="mt-2 text-lg font-bold">Consider {analysisStats.filter((item) => item.digit > 5).reduce((sum, item) => sum + item.pct, 0) >= analysisStats.filter((item) => item.digit < 5).reduce((sum, item) => sum + item.pct, 0) ? 'Over 5' : 'Under 5'}</p><p className="mt-1 text-xs text-gray-400">Signals summarize recent ticks and cannot guarantee the next outcome.</p></div>
+          </div>
+        </main>
+      )}
+
+      {currentTab === 'trading-calculator' && (
+        <main className="flex-1 overflow-y-auto bg-[#f4f7f8] p-4 pb-24 text-[#17212b] sm:p-8 sm:pb-8">
+          <div className="mx-auto max-w-6xl space-y-5">
+            <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Risk &amp; money management</p>
+                <h1 className="mt-1 text-2xl font-black sm:text-3xl">Trading Calculator</h1>
+                <p className="mt-2 max-w-2xl text-sm text-slate-500">Model stake size, payout assumptions, break-even, drawdown, compounding, and contract scenarios before trading.</p>
+              </div>
+              <span className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-600">Informational calculator</span>
+            </header>
+
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <section className="border-b border-slate-200 pb-5 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5">
+                <h2 className="text-base font-extrabold">Inputs</h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+                    Contract
+                    <select value={calculatorContract} onChange={(event) => setCalculatorContract(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500">
+                      <option>Rise / Fall</option><option>Digits</option><option>Accumulator</option><option>Multiplier</option><option>Binary / Options</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Account balance ({account?.currency ?? 'USD'})
+                    <input aria-label="Account balance" type="number" min="0" step="0.01" value={calculatorBalance} onChange={(event) => setCalculatorBalance(Math.max(0, Number(event.target.value) || 0))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Risk per trade (%)
+                    <input aria-label="Risk per trade percent" type="number" min="0" max="100" step="0.1" value={calculatorRiskPercent} onChange={(event) => setCalculatorRiskPercent(Math.min(100, Math.max(0, Number(event.target.value) || 0)))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Planned stake ({account?.currency ?? 'USD'})
+                    <input aria-label="Planned stake" type="number" min="0" step="0.01" value={calculatorPlannedStake} onChange={(event) => setCalculatorPlannedStake(Math.max(0, Number(event.target.value) || 0))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Payout / return (%)
+                    <input aria-label="Payout return percent" type="number" min="0" step="0.1" value={calculatorReturnPercent} onChange={(event) => setCalculatorReturnPercent(Math.max(0, Number(event.target.value) || 0))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Expected win rate (%)
+                    <input aria-label="Expected win rate percent" type="number" min="0" max="100" step="0.1" value={calculatorWinRate} onChange={(event) => setCalculatorWinRate(Math.min(100, Math.max(0, Number(event.target.value) || 0)))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Loss streak to stress-test
+                    <input aria-label="Loss streak trades" type="number" min="0" max="20" step="1" value={calculatorLossStreak} onChange={(event) => setCalculatorLossStreak(Math.min(20, Math.max(0, Math.floor(Number(event.target.value) || 0))))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Compounding rate (%)
+                    <input aria-label="Compounding rate percent" type="number" min="0" max="100" step="0.1" value={calculatorCompoundingPercent} onChange={(event) => setCalculatorCompoundingPercent(Math.min(100, Math.max(0, Number(event.target.value) || 0)))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+                    Target account growth (%)
+                    <input aria-label="Target account growth percent" type="number" min="0" step="0.1" value={calculatorGrowthTarget} onChange={(event) => setCalculatorGrowthTarget(Math.max(0, Number(event.target.value) || 0))} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-500" />
+                  </label>
+                </div>
+                {activeBalance !== null && <p className="mt-3 text-[10px] text-slate-500">Balance initialized from connected account {account?.loginid}; you can edit it for scenario planning.</p>}
+              </section>
+
+              <section>
+                <h2 className="text-base font-extrabold">Calculated plan</h2>
+                <p className="mt-1 text-xs text-slate-500">{calculatorContract} · values use your assumptions</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {[
+                    { label: 'Risk budget', value: `${calculatorRiskBudget.toFixed(2)} ${account?.currency ?? 'USD'}`, detail: `Maximum amount at ${calculatorRiskPercent}% risk.`, color: 'text-slate-900' },
+                    { label: 'Suggested stake ceiling', value: `${calculatorSuggestedStake.toFixed(2)} ${account?.currency ?? 'USD'}`, detail: 'Based on account balance and selected risk.', color: 'text-slate-900' },
+                    { label: 'Profit if win', value: `+${calculatorWinProfit.toFixed(2)} ${account?.currency ?? 'USD'}`, detail: 'At the current return assumption.', color: 'text-emerald-700' },
+                    { label: 'Break-even win rate', value: `${calculatorBreakEvenRate.toFixed(1)}%`, detail: 'Approximate rate required at this return.', color: 'text-slate-900' },
+                    { label: 'Expected value / trade', value: `${calculatorExpectedValue >= 0 ? '+' : ''}${calculatorExpectedValue.toFixed(2)} ${account?.currency ?? 'USD'}`, detail: 'Based on the entered win-rate assumption.', color: calculatorExpectedValue >= 0 ? 'text-emerald-700' : 'text-rose-700' },
+                    { label: 'Stress-test drawdown', value: `-${calculatorDrawdown.toFixed(2)} ${account?.currency ?? 'USD'}`, detail: `${calculatorLossStreak} consecutive losses with 2× progression.`, color: 'text-rose-700' },
+                  ].map((metric) => (
+                    <article key={metric.label} className="rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">{metric.label}</p>
+                      <strong className={`mt-2 block text-lg font-black ${metric.color}`}>{metric.value}</strong>
+                      <p className="mt-1 text-[10px] leading-4 text-slate-500">{metric.detail}</p>
+                    </article>
+                  ))}
+                </div>
+
+                <section className="mt-4 border-y border-slate-200 py-4">
+                  <h3 className="text-sm font-bold">Scenario summary</h3>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-4">
+                    <div><dt className="text-slate-500">Stake / balance</dt><dd className="mt-1 font-bold text-slate-900">{calculatorStakeRatio.toFixed(2)}%</dd></div>
+                    <div><dt className="text-slate-500">{calculatorGrowthTarget}% target profit</dt><dd className="mt-1 font-bold text-slate-900">{calculatorGrowthAmount.toFixed(2)} {account?.currency ?? 'USD'}</dd></div>
+                    <div><dt className="text-slate-500">Next compounding stake</dt><dd className="mt-1 font-bold text-slate-900">{calculatorNextStake.toFixed(2)} {account?.currency ?? 'USD'}</dd></div>
+                    <div><dt className="text-slate-500">Estimated edge</dt><dd className={`mt-1 font-bold ${calculatorEdge >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{calculatorEdge.toFixed(2)}%</dd></div>
+                  </dl>
+                </section>
+
+                <button type="button" disabled={calculatorSuggestedStake <= 0} onClick={() => { setStake(calculatorSuggestedStake); setCurrentTab('manual-trading'); }} className="mt-4 w-full rounded-lg bg-teal-500 px-4 py-3 text-sm font-black text-[#071217] transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-50">Use suggested stake in Manual Trading</button>
+                <p className="mt-3 text-[10px] leading-4 text-slate-500">These are mathematical scenarios, not guarantees. Actual Deriv pricing, payout, barriers, fees, and execution can differ by contract, symbol, and market conditions.</p>
+              </section>
+            </div>
           </div>
         </main>
       )}
