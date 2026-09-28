@@ -70,7 +70,7 @@ npm run build
 - Admin mode is not openly exposed in normal client flow.
 - Access is controlled by a hidden trigger in the footer that toggles between client and admin view.
 - The default admin password is set from the environment variable `VITE_ADMIN_PASSWORD`; if not provided, the app falls back to `ben2026`.
-- Once unlocked, the admin area shows a dedicated admin control strip for demo trade simulation and testing flows.
+- Once unlocked, demo trade simulation and reset actions are available from a collapsed bottom `Admin tools` drawer, keeping them out of the main trading layout until opened.
 
 ### Mobile UI refinement
 

@@ -213,6 +213,7 @@ export default function App() {
   const [isLightTheme, setIsLightTheme] = useState(false);
   const [appMode, setAppMode] = useState<'client' | 'admin'>('client');
   const [adminUnlocked, setAdminUnlocked] = useState<boolean>(() => sessionStorage.getItem('smart-trades-admin-unlocked') === 'true');
+  const [isAdminToolsOpen, setIsAdminToolsOpen] = useState(false);
   const [isAdminAccessOpen, setIsAdminAccessOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminPasswordError, setAdminPasswordError] = useState('');
@@ -485,6 +486,7 @@ export default function App() {
     setAdminUnlocked(false);
     sessionStorage.removeItem('smart-trades-admin-unlocked');
     setAppMode('client');
+    setIsAdminToolsOpen(false);
     setIsAdminAccessOpen(false);
   }
 
@@ -1076,23 +1078,6 @@ export default function App() {
           </div>
         </div>
       </header>
-
-      {appMode === 'admin' && (
-        <div className="shrink-0 border-b border-[#22222c] bg-[#0e1b20] px-4 py-3">
-          <div className="mx-auto flex max-w-7xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300">Admin controls</p>
-              <p className="mt-1 text-sm font-semibold text-white">Simulate trading outcomes and validate the app flow in a controlled workspace</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => addSimulatedTrade('win')} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#061713] hover:bg-emerald-400">Fake win +$30</button>
-              <button onClick={() => addSimulatedTrade('loss')} className="rounded-xl bg-rose-500 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-rose-400">Fake loss -$20</button>
-              <button onClick={() => addSimulatedTrade('profit')} className="rounded-xl bg-cyan-500 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#071217] hover:bg-cyan-400">Fake profit +$44</button>
-              <button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="rounded-xl border border-slate-700 bg-[#17171f] px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-gray-200 hover:border-slate-500">Reset demo</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <nav className="sticky top-0 z-30 border-b border-[#212833] bg-[#0f141b]/95 px-2 py-2 shadow-[0_8px_18px_rgba(5,10,14,0.25)] backdrop-blur sm:px-3 md:hidden">
         <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto pb-1">
@@ -1916,6 +1901,28 @@ export default function App() {
             </form>
           </section>
         </div>
+      )}
+
+      {appMode === 'admin' && (
+        <aside className="fixed bottom-10 left-2 z-30 flex flex-col items-start gap-2 md:bottom-4 md:left-4" aria-label="Admin testing tools">
+          {isAdminToolsOpen && (
+            <div className="w-[min(92vw,20rem)] rounded-xl border border-slate-700 bg-[#111820]/95 p-3 text-white shadow-2xl backdrop-blur">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Test outcomes</p>
+                <button type="button" onClick={() => setIsAdminToolsOpen(false)} className="rounded p-1 text-slate-400 hover:text-white" aria-label="Hide admin tools">×</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => addSimulatedTrade('win')} className="rounded-lg bg-emerald-500 px-2 py-2 text-[10px] font-black uppercase text-[#061713] hover:bg-emerald-400">Fake win +$30</button>
+                <button onClick={() => addSimulatedTrade('loss')} className="rounded-lg bg-rose-500 px-2 py-2 text-[10px] font-black uppercase text-white hover:bg-rose-400">Fake loss -$20</button>
+                <button onClick={() => addSimulatedTrade('profit')} className="rounded-lg bg-cyan-500 px-2 py-2 text-[10px] font-black uppercase text-[#071217] hover:bg-cyan-400">Fake profit +$44</button>
+                <button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="rounded-lg border border-slate-700 bg-[#17171f] px-2 py-2 text-[10px] font-black uppercase text-gray-200 hover:border-slate-500">Reset demo</button>
+              </div>
+            </div>
+          )}
+          <button type="button" onClick={() => setIsAdminToolsOpen((open) => !open)} aria-expanded={isAdminToolsOpen} className="rounded-full border border-slate-700 bg-[#111820]/90 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400 shadow-lg backdrop-blur transition hover:border-amber-400/60 hover:text-amber-200">
+            {isAdminToolsOpen ? 'Hide tools' : 'Admin tools'}
+          </button>
+        </aside>
       )}
 
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700/80 bg-[#f8fafc]/95 px-2 py-1.5 text-[7px] font-semibold uppercase tracking-[0.12em] text-slate-700 shadow-[0_-8px_18px_rgba(15,23,42,0.08)] backdrop-blur-sm md:static md:bottom-auto md:z-auto md:border-t md:bg-[#0f1016] md:px-4 md:py-3 md:text-[10px] md:text-gray-400">
