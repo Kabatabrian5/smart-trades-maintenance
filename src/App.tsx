@@ -240,6 +240,8 @@ export default function App() {
   const [authStatus, setAuthStatus] = useState<'idle' | 'authorizing' | 'failed'>('idle');
   const [authError, setAuthError] = useState('');
   const announcedSettlements = useRef<Set<string>>(new Set());
+  const contractSettlementWaiters = useRef<Map<string, (profit: number) => void>>(new Map());
+  const multiTradeRunning = useRef(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 1700);
@@ -501,7 +503,8 @@ export default function App() {
   const [stopLossEnabled, setStopLossEnabled] = useState(true);
   const [takeProfitTarget, setTakeProfitTarget] = useState(30);
   const [stopLossLimit, setStopLossLimit] = useState(-20);
-  const [maxTradesPerCycle, setMaxTradesPerCycle] = useState(4);
+  const [isMultiTradeRunning, setIsMultiTradeRunning] = useState(false);
+  const stopMultiTradeRef = useRef(false);
   const [proposalPayouts, setProposalPayouts] = useState<Record<string, number | null>>({});
   const [ticksCount, setTicksCount] = useState(1);
   const [positions, setPositions] = useState<Position[]>(() => {
@@ -780,51 +783,102 @@ export default function App() {
   }
 
   const handlePurchase = async (contractType: string) => {
-    const cycleTrades = executionMode === 'multiple' ? Math.max(1, maxTradesPerCycle) : 1;
+    if (executionMode === 'multiple' && multiTradeRunning.current) return;
+    if (executionMode === 'multiple' && !takeProfitEnabled && !stopLossEnabled) {
+      alert('Enable take profit or stop loss before starting multi-trade mode.');
+      return;
+    }
+
+    if (executionMode === 'multiple') {
+      multiTradeRunning.current = true;
+      stopMultiTradeRef.current = false;
+      setIsMultiTradeRunning(true);
+    }
+
+    const placeTrade = async (waitForSettlement: boolean) => {
+      const tradeStake = Math.max(0.35, stake);
+      const needsBarrier = ['DIGITMATCH', 'DIGITDIFF', 'DIGITOVER', 'DIGITUNDER', 'ONETOUCH', 'NOTOUCH'].includes(contractType);
+      const proposalRes = await derivService.send({
+        proposal: 1,
+        amount: tradeStake,
+        basis: 'stake',
+        currency: 'USD',
+        underlying_symbol: selectedSymbol,
+        contract_type: contractType,
+        duration: ticksCount,
+        duration_unit: 't',
+        ...(needsBarrier ? { barrier: selectedDigit.toString() } : {}),
+      });
+
+      if (!proposalRes.proposal) return null;
+
+      const buyRes = await derivService.buyContract(proposalRes.proposal.id, proposalRes.proposal.ask_price);
+      const recordedPosition: Position = {
+        id: String(buyRes.buy.contract_id),
+        symbol: selectedSymbol,
+        contract: contractType,
+        stake: tradeStake,
+        duration: ticksCount,
+        createdAt: Date.now(),
+        status: 'Open',
+      };
+
+      let settlement: Promise<number> | undefined;
+      let settlementTimeout: number | undefined;
+      if (waitForSettlement) {
+        settlement = new Promise((resolve, reject) => {
+          settlementTimeout = window.setTimeout(() => {
+            contractSettlementWaiters.current.delete(recordedPosition.id);
+            reject(new Error('Timed out waiting for the contract to settle.'));
+          }, 5 * 60 * 1000);
+          contractSettlementWaiters.current.set(recordedPosition.id, (profit) => {
+            if (settlementTimeout !== undefined) window.clearTimeout(settlementTimeout);
+            resolve(profit);
+          });
+        });
+      }
+
+      setPositions((current) => {
+        const updatedPositions = [recordedPosition, ...current];
+        sessionStorage.setItem('smart-trades-positions', JSON.stringify(updatedPositions));
+        return updatedPositions;
+      });
+      setCurrentTab('positions');
+      try {
+        await derivService.subscribeToContract(recordedPosition.id);
+      } catch (error) {
+        if (settlementTimeout !== undefined) window.clearTimeout(settlementTimeout);
+        contractSettlementWaiters.current.delete(recordedPosition.id);
+        throw error;
+      }
+      await derivService.refreshBalance();
+      return { recordedPosition, settlement };
+    };
 
     try {
-      for (let tradeIndex = 0; tradeIndex < cycleTrades; tradeIndex += 1) {
-        const tradeStake = Math.max(0.35, stake);
-        const needsBarrier = ['DIGITMATCH', 'DIGITDIFF', 'DIGITOVER', 'DIGITUNDER', 'ONETOUCH', 'NOTOUCH'].includes(contractType);
-        const proposalRes = await derivService.send({
-          proposal: 1,
-          amount: tradeStake,
-          basis: 'stake',
-          currency: 'USD',
-          underlying_symbol: selectedSymbol,
-          contract_type: contractType,
-          duration: ticksCount,
-          duration_unit: 't',
-          ...(needsBarrier ? { barrier: selectedDigit.toString() } : {}),
-        });
-
-        if (!proposalRes.proposal) break;
-
-        const buyRes = await derivService.buyContract(proposalRes.proposal.id, proposalRes.proposal.ask_price);
-        const recordedPosition: Position = {
-          id: String(buyRes.buy.contract_id),
-          symbol: selectedSymbol,
-          contract: contractType,
-          stake: tradeStake,
-          duration: ticksCount,
-          createdAt: Date.now(),
-          status: 'Open',
-        };
-        setPositions((current) => {
-          const updatedPositions = [recordedPosition, ...current];
-          sessionStorage.setItem('smart-trades-positions', JSON.stringify(updatedPositions));
-          return updatedPositions;
-        });
-        setCurrentTab('positions');
-        await derivService.subscribeToContract(String(buyRes.buy.contract_id));
-        await derivService.refreshBalance();
-
-        if (takeProfitEnabled && totalProfitLoss >= takeProfitTarget) break;
-        if (stopLossEnabled && totalProfitLoss <= stopLossLimit) break;
+      if (executionMode === 'single') {
+        await placeTrade(false);
+        return;
       }
-      setCurrentTab('positions');
+
+      let cycleProfitLoss = 0;
+      while (true) {
+        const takeProfitReached = takeProfitEnabled && cycleProfitLoss >= takeProfitTarget;
+        const stopLossReached = stopLossEnabled && cycleProfitLoss <= stopLossLimit;
+
+        if (takeProfitReached || stopLossReached || stopMultiTradeRef.current) break;
+
+        const placedTrade = await placeTrade(true);
+        if (!placedTrade?.settlement) break;
+        cycleProfitLoss += await placedTrade.settlement;
+      }
     } catch (error: any) {
       alert(`Trade failed: ${error.message || 'Unknown error'}`);
+    } finally {
+      if (executionMode === 'multiple') {
+        multiTradeRunning.current = false;
+        setIsMultiTradeRunning(false);
+      }
     }
   };
 
@@ -896,6 +950,8 @@ export default function App() {
       });
 
       if (settled) {
+        contractSettlementWaiters.current.get(contractId)?.(adjustedProfit);
+        contractSettlementWaiters.current.delete(contractId);
         if (!announcedSettlements.current.has(contractId)) {
           announcedSettlements.current.add(contractId);
           playTradeSound(result);
@@ -974,7 +1030,7 @@ export default function App() {
     const localProfit = totalProfitLoss;
     if (takeProfitEnabled && localProfit >= takeProfitTarget) return `TP reached: ${takeProfitTarget} USD`;
     if (stopLossEnabled && localProfit <= stopLossLimit) return `SL reached: ${stopLossLimit} USD`;
-    if (executionMode === 'multiple') return `Cycle active: up to ${maxTradesPerCycle} trades`;
+    if (executionMode === 'multiple') return 'Cycle active: continue until TP or SL is reached';
     return 'Single-trade mode';
   })();
   const contractsLost = settledPositions.filter((position) => position.result === 'lost').length;
@@ -1136,6 +1192,12 @@ export default function App() {
                 <button type="button" onClick={() => setExecutionMode('single')} className={`rounded-lg px-2 py-1.5 ${executionMode === 'single' ? 'bg-gradient-to-r from-teal-400 to-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(45,212,191,0.2)]' : 'bg-[#18232d] text-slate-300'}`}>One at a time</button>
                 <button type="button" onClick={() => setExecutionMode('multiple')} className={`rounded-lg px-2 py-1.5 ${executionMode === 'multiple' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950' : 'bg-[#18232d] text-slate-300'}`}>Multi trade</button>
               </div>
+              {executionMode === 'multiple' && (
+                <div className="mt-2 flex items-center justify-between rounded-lg border border-[#263642] bg-[#0f1720] px-2 py-1.5 text-[9px]">
+                  <span className={isMultiTradeRunning ? 'text-emerald-300' : 'text-slate-400'}>{isMultiTradeRunning ? 'Cycle running' : 'Ready: stops at TP or SL'}</span>
+                  {isMultiTradeRunning && <button type="button" onClick={() => { stopMultiTradeRef.current = true; }} className="rounded-md border border-rose-500/50 px-2 py-1 font-bold text-rose-300">Stop after trade</button>}
+                </div>
+              )}
               <div className="mt-2 grid grid-cols-2 gap-2 text-[9px] text-slate-300 sm:text-[10px]">
                 <label className="flex items-center justify-between gap-2 rounded-lg border border-[#263642] bg-[#0f1720] px-2 py-1.5">
                   <span className="flex items-center gap-1.5">
@@ -1249,8 +1311,10 @@ export default function App() {
                   </label>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[#263642] bg-[#0f1720] p-2 text-[9px] text-slate-400 sm:text-[10px]">
-                  <span>Cycle max</span>
-                  <input type="number" min="1" max="10" value={maxTradesPerCycle} onChange={(event) => setMaxTradesPerCycle(Math.min(10, Math.max(1, Number(event.target.value) || 1)))} className="w-10 bg-transparent text-right text-sm font-bold text-white outline-none sm:w-12" />
+                  <span className={isMultiTradeRunning ? 'text-emerald-300' : 'text-slate-400'}>{isMultiTradeRunning ? 'Cycle running' : 'Cycle'}</span>
+                  {isMultiTradeRunning
+                    ? <button type="button" onClick={() => { stopMultiTradeRef.current = true; }} className="rounded-lg border border-rose-500/50 px-2 py-1 font-bold text-rose-300">Stop after trade</button>
+                    : <span className="text-right text-[10px] font-bold text-emerald-300">Continue until TP/SL</span>}
                 </div>
               </div>
 
@@ -1888,8 +1952,7 @@ export default function App() {
           <section className="w-full max-w-sm rounded-2xl border border-[#30303d] bg-[#17171f] p-5 text-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="admin-access-title" onClick={(event) => event.stopPropagation()}>
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-300">Developed by Brian</p>
-                <h2 id="admin-access-title" className="mt-2 text-xl font-extrabold">Admin access</h2>
+                <h2 id="admin-access-title" className="text-xl font-extrabold">Admin access</h2>
               </div>
               <button type="button" onClick={() => setIsAdminAccessOpen(false)} className="text-2xl leading-none text-gray-400 hover:text-white" aria-label="Close admin access">&times;</button>
             </div>
@@ -1939,7 +2002,7 @@ export default function App() {
             className="shrink-0 cursor-pointer truncate text-[8px] text-slate-800 transition hover:text-slate-600 sm:text-[9px] md:text-[10px] md:text-teal-300 md:hover:text-teal-200"
             aria-label={appMode === 'admin' ? 'Return to client mode' : 'Open admin mode'}
           >
-            {appMode === 'admin' ? 'Back to client' : 'Developed by Brian'}
+            {appMode === 'admin' ? 'Back to client' : 'Assistance'}
           </button>
         </div>
       </footer>
