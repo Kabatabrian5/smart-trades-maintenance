@@ -214,6 +214,7 @@ export default function App() {
   const [appMode, setAppMode] = useState<'client' | 'admin'>('client');
   const [adminUnlocked, setAdminUnlocked] = useState<boolean>(() => sessionStorage.getItem('smart-trades-admin-unlocked') === 'true');
   const [isAdminToolsOpen, setIsAdminToolsOpen] = useState(false);
+  const [simulatedWinAmount, setSimulatedWinAmount] = useState(30);
   const [isAdminAccessOpen, setIsAdminAccessOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminPasswordError, setAdminPasswordError] = useState('');
@@ -1007,6 +1008,14 @@ export default function App() {
 
   const activeAccountType = account ? getAccountType(account) : null;
   const activeBalance = account ? account.balance ?? accountBalances[activeAccountType || 'real'] : null;
+  const simulatedProfit = positions
+    .filter((position) => position.id.startsWith('sim-'))
+    .reduce((total, position) => total + (position.profit ?? 0), 0);
+  const adminTestBalance = activeBalance === null ? null : activeBalance + simulatedProfit;
+  const liveAccountOption = availableAccounts.find((option) => {
+    const status = option.status.toLowerCase();
+    return option.account_type === 'real' && !['closed', 'disabled', 'suspended', 'inactive'].includes(status);
+  });
   useEffect(() => {
     if (activeBalance !== null) setCalculatorBalance(activeBalance);
   }, [account?.loginid]);
@@ -1049,12 +1058,13 @@ export default function App() {
 
   function addSimulatedTrade(mode: 'win' | 'loss' | 'profit') {
     const amountMap = {
-      win: { stake: 10, payout: 32, profit: 30, label: 'Win' },
       loss: { stake: 10, payout: 0, profit: -20, label: 'Loss' },
       profit: { stake: 10, payout: 42, profit: 44, label: 'Profit' },
     } as const;
 
-    const selected = amountMap[mode];
+    const selected = mode === 'win'
+      ? { stake: 10, payout: 10 + simulatedWinAmount, profit: simulatedWinAmount, label: 'Win' }
+      : amountMap[mode];
     const simulated: Position = {
       id: `sim-${Date.now()}`,
       symbol: selectedSymbol,
@@ -1108,6 +1118,7 @@ export default function App() {
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {account && <div className="hidden items-center gap-1 md:flex"><span className="rounded-lg border border-emerald-500/30 px-2 py-1 text-[9px] font-bold text-emerald-300">Real: {accountBalances.real === null ? '--' : accountBalances.real.toFixed(2)} {accountBalances.currency}</span><span className="rounded-lg border border-sky-500/30 px-2 py-1 text-[9px] font-bold text-sky-300">Demo: {accountBalances.demo === null ? '--' : accountBalances.demo.toFixed(2)} {accountBalances.currency}</span></div>}
+            {appMode === 'admin' && account && <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[8px] font-bold text-amber-200" title="Simulated admin balance only; this does not change your Deriv balance">TEST {adminTestBalance === null ? '--' : adminTestBalance.toFixed(2)} {account.currency}</span>}
 
             <div className="flex items-center gap-1.5 rounded-full border border-[#2b3340] bg-[#161d27] px-1.5 py-1">
               <button onClick={() => setIsLightTheme((theme) => !theme)} className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-[#171d25] text-[10px] font-bold text-gray-200 transition hover:border-teal-400 hover:text-white">{isLightTheme ? '☾' : '☀'}</button>
@@ -1927,20 +1938,36 @@ export default function App() {
                 </div>
                 <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-300">Deriv</span>
               </div>
-              <ol className="mt-4 space-y-3 text-xs text-gray-300">
-                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">1</span>Open the Deriv cashier page from the button below.</li>
-                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">2</span>For deposit, scroll down and select <span className="font-bold text-white">Mobile Money / Dusupay</span>.</li>
-                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">3</span>Choose the amount, confirm the payment, and your USD balance updates on Deriv.</li>
-                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">4</span>For withdrawal, use the secure Deriv withdraw flow and select the relevant withdrawal method.</li>
-              </ol>
-              <div className="mt-4 grid grid-cols-1 gap-2">
-                <a href={cashierTab === 'deposit' ? DERIV_DEPOSIT_URL : DERIV_WITHDRAW_URL} target="_blank" rel="noreferrer" className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-center text-sm font-bold text-[#071217] transition hover:bg-emerald-400">
-                  {cashierTab === 'deposit' ? 'Open Deriv deposit page' : 'Open Deriv withdraw page'}
-                </a>
-                <button onClick={() => setCashierTab(cashierTab === 'deposit' ? 'withdraw' : 'deposit')} className="w-full rounded-xl border border-[#30303d] bg-[#17171f] px-4 py-3 text-sm font-bold text-gray-200 transition hover:border-emerald-500 hover:text-white">
-                  Switch to {cashierTab === 'deposit' ? 'withdraw' : 'deposit'}
-                </button>
-              </div>
+              {cashierTab === 'withdraw' && activeAccountType === 'demo' ? (
+                <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                  <p className="text-sm font-bold text-amber-200">Withdrawals require a Live account</p>
+                  <p className="mt-2 text-xs leading-5 text-gray-300">You’re using a Demo account. Switch to your Live account before opening the withdrawal flow.</p>
+                  {liveAccountOption ? (
+                    <button type="button" onClick={() => void switchAccount(liveAccountOption)} className="mt-4 w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-[#071217] transition hover:bg-emerald-400">Switch to Live account</button>
+                  ) : (
+                    <button type="button" onClick={() => { setIsCashierOpen(false); setIsAccountMenuOpen(true); }} className="mt-4 w-full rounded-xl border border-amber-400/40 px-4 py-3 text-sm font-bold text-amber-100 transition hover:bg-amber-400/10">Choose a Live account</button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <ol className="mt-4 space-y-3 text-xs text-gray-300">
+                    <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">1</span>Open the Deriv cashier page from the button below.</li>
+                    {cashierTab === 'deposit' && <>
+                      <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">2</span>For deposit, scroll down and select <span className="font-bold text-white">Mobile Money / Dusupay</span>.</li>
+                      <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">3</span>Choose the amount, confirm the payment, and your USD balance updates on Deriv.</li>
+                    </>}
+                    {cashierTab === 'withdraw' && <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-300">2</span>Continue in the secure Deriv Live account withdrawal flow.</li>}
+                  </ol>
+                  <div className="mt-4 grid grid-cols-1 gap-2">
+                    <a href={cashierTab === 'deposit' ? DERIV_DEPOSIT_URL : DERIV_WITHDRAW_URL} target="_blank" rel="noreferrer" className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-center text-sm font-bold text-[#071217] transition hover:bg-emerald-400">
+                      {cashierTab === 'deposit' ? 'Open Deriv deposit page' : 'Open Deriv withdraw page'}
+                    </a>
+                    <button onClick={() => setCashierTab(cashierTab === 'deposit' ? 'withdraw' : 'deposit')} className="w-full rounded-xl border border-[#30303d] bg-[#17171f] px-4 py-3 text-sm font-bold text-gray-200 transition hover:border-emerald-500 hover:text-white">
+                      Switch to {cashierTab === 'deposit' ? 'withdraw' : 'deposit'}
+                    </button>
+                  </div>
+                </>
+              )}
               <p className="mt-4 text-center text-[10px] text-gray-600">Powered by Deriv Cashier • Dusupay</p>
             </div>
           </section>
@@ -1974,12 +2001,17 @@ export default function App() {
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Test outcomes</p>
                 <button type="button" onClick={() => setIsAdminToolsOpen(false)} className="rounded p-1 text-slate-400 hover:text-white" aria-label="Hide admin tools">×</button>
               </div>
+              <label className="mb-2 block text-[10px] font-semibold text-slate-300">
+                Fake win amount ({account?.currency ?? 'USD'})
+                <input type="number" min="0.01" step="0.01" value={simulatedWinAmount} onChange={(event) => setSimulatedWinAmount(Math.max(0.01, Number(event.target.value) || 0.01))} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b1118] px-2 py-1.5 text-xs font-bold text-white outline-none focus:border-emerald-400" />
+              </label>
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => addSimulatedTrade('win')} className="rounded-lg bg-emerald-500 px-2 py-2 text-[10px] font-black uppercase text-[#061713] hover:bg-emerald-400">Fake win +$30</button>
+                <button onClick={() => addSimulatedTrade('win')} className="rounded-lg bg-emerald-500 px-2 py-2 text-[10px] font-black uppercase text-[#061713] hover:bg-emerald-400">Fake win +{simulatedWinAmount.toFixed(2)}</button>
                 <button onClick={() => addSimulatedTrade('loss')} className="rounded-lg bg-rose-500 px-2 py-2 text-[10px] font-black uppercase text-white hover:bg-rose-400">Fake loss -$20</button>
                 <button onClick={() => addSimulatedTrade('profit')} className="rounded-lg bg-cyan-500 px-2 py-2 text-[10px] font-black uppercase text-[#071217] hover:bg-cyan-400">Fake profit +$44</button>
                 <button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="rounded-lg border border-slate-700 bg-[#17171f] px-2 py-2 text-[10px] font-black uppercase text-gray-200 hover:border-slate-500">Reset demo</button>
               </div>
+              <p className="mt-2 text-[9px] leading-4 text-amber-200/80">TEST balance is simulated for admin preview only. Deriv balances and funds are not changed.</p>
             </div>
           )}
           <button type="button" onClick={() => setIsAdminToolsOpen((open) => !open)} aria-expanded={isAdminToolsOpen} className="rounded-full border border-slate-700 bg-[#111820]/90 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.1em] text-slate-400 shadow-lg backdrop-blur transition hover:border-amber-400/60 hover:text-amber-200">
