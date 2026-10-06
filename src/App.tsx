@@ -215,6 +215,7 @@ export default function App() {
   const [adminUnlocked, setAdminUnlocked] = useState<boolean>(() => sessionStorage.getItem('smart-trades-admin-unlocked') === 'true');
   const [isAdminToolsOpen, setIsAdminToolsOpen] = useState(false);
   const [simulatedWinAmount, setSimulatedWinAmount] = useState('30');
+  const [simulatedLossAmount, setSimulatedLossAmount] = useState('20');
   const [isAdminAccessOpen, setIsAdminAccessOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminPasswordError, setAdminPasswordError] = useState('');
@@ -1054,10 +1055,12 @@ export default function App() {
 
   function addSimulatedTrade(mode: 'win' | 'loss' | 'profit') {
     const winAmount = Number(simulatedWinAmount);
+    const lossAmount = Number(simulatedLossAmount);
     if ((mode === 'win' || mode === 'profit') && (!Number.isFinite(winAmount) || winAmount <= 0)) return;
+    if (mode === 'loss' && (!Number.isFinite(lossAmount) || lossAmount <= 0)) return;
 
     const amountMap = {
-      loss: { stake: 10, payout: 0, profit: -20, label: 'Loss' },
+      loss: { stake: 10, payout: 0, profit: -lossAmount, label: 'Loss' },
       profit: { stake: 10, payout: 42, profit: 44, label: 'Profit' },
     } as const;
 
@@ -1082,7 +1085,7 @@ export default function App() {
     if (account) {
       const accountType = getAccountType(account);
       const currentBalance = account.balance ?? accountBalances[accountType] ?? 0;
-      const delta = mode === 'loss' ? -20 : mode === 'profit' ? 44 : winAmount;
+      const delta = mode === 'loss' ? -lossAmount : mode === 'profit' ? 44 : winAmount;
       const nextBalance = currentBalance + delta;
       const updatedAccount = { ...account, balance: nextBalance };
       setAccount(updatedAccount);
@@ -2010,13 +2013,19 @@ export default function App() {
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Test outcomes</p>
                 <button type="button" onClick={() => setIsAdminToolsOpen(false)} className="rounded p-1 text-slate-400 hover:text-white" aria-label="Hide admin tools">×</button>
               </div>
-              <label className="mb-2 block text-[10px] font-semibold text-slate-300">
-                Fake win amount ({account?.currency ?? 'USD'})
-                <input type="number" inputMode="decimal" step="0.01" value={simulatedWinAmount} onChange={(event) => setSimulatedWinAmount(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b1118] px-2 py-1.5 text-xs font-bold text-white outline-none focus:border-emerald-400" />
-              </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2">
+                <label className="block text-[10px] font-semibold text-slate-300">
+                  Fake win amount ({account?.currency ?? 'USD'})
+                  <input type="number" inputMode="decimal" step="0.01" value={simulatedWinAmount} onChange={(event) => setSimulatedWinAmount(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b1118] px-2 py-1.5 text-xs font-bold text-white outline-none focus:border-emerald-400" />
+                </label>
+                <label className="block text-[10px] font-semibold text-slate-300">
+                  Fake loss amount ({account?.currency ?? 'USD'})
+                  <input type="number" inputMode="decimal" step="0.01" value={simulatedLossAmount} onChange={(event) => setSimulatedLossAmount(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#0b1118] px-2 py-1.5 text-xs font-bold text-white outline-none focus:border-rose-400" />
+                </label>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 <button disabled={!Number.isFinite(Number(simulatedWinAmount)) || Number(simulatedWinAmount) <= 0} onClick={() => addSimulatedTrade('win')} className="rounded-lg bg-emerald-500 px-2 py-2 text-[10px] font-black uppercase text-[#061713] hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50">Fake win +{Number(simulatedWinAmount || 0).toFixed(2)}</button>
-                <button onClick={() => addSimulatedTrade('loss')} className="rounded-lg bg-rose-500 px-2 py-2 text-[10px] font-black uppercase text-white hover:bg-rose-400">Fake loss -$20</button>
+                <button disabled={!Number.isFinite(Number(simulatedLossAmount)) || Number(simulatedLossAmount) <= 0} onClick={() => addSimulatedTrade('loss')} className="rounded-lg bg-rose-500 px-2 py-2 text-[10px] font-black uppercase text-white hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50">Fake loss -{Number(simulatedLossAmount || 0).toFixed(2)}</button>
                 <button onClick={() => addSimulatedTrade('profit')} className="rounded-lg bg-cyan-500 px-2 py-2 text-[10px] font-black uppercase text-[#071217] hover:bg-cyan-400">Fake profit +$44</button>
                 <button onClick={() => { setPositions([]); sessionStorage.removeItem('smart-trades-positions'); }} className="rounded-lg border border-slate-700 bg-[#17171f] px-2 py-2 text-[10px] font-black uppercase text-gray-200 hover:border-slate-500">Reset demo</button>
               </div>
