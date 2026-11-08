@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PositionsDrawer from './components/layout/PositionsDrawer';
+import LivePriceChart from './components/trading/LivePriceChart';
 import { useDerivSocket } from './hooks/useDerivSocket';
 import { derivService } from './services/derivSocket';
 import { fetchOptionsAccounts, requestAccountWebSocketUrl, pickPrimaryAccount, type DerivOptionsAccount } from './services/derivAccounts';
@@ -519,7 +520,7 @@ export default function App() {
   const [isSearchingSignals, setIsSearchingSignals] = useState(false);
   const [aiScannerOpen, setAiScannerOpen] = useState(false);
   const [scannerProgress, setScannerProgress] = useState(0);
-  const { currentTick, marketStatus, digitHistory } = useDerivSocket(selectedSymbol);
+  const { currentTick, marketStatus, digitHistory, priceHistory } = useDerivSocket(selectedSymbol);
 
   const signalMarketType = marketSymbolToMarketType(signalMarket);
   const signalScan = scanMarket(signalMarketType);
@@ -1203,6 +1204,8 @@ export default function App() {
                 {marketStatus}
               </div>
             </div>
+
+            <LivePriceChart symbol={selectedSymbol} prices={priceHistory} currentPrice={currentTick} marketStatus={marketStatus} />
 
             <div className="order-2 rounded-2xl border border-[#202a35] bg-[#111b22] p-2 md:order-none md:hidden">
               <div className="flex items-center gap-2">

@@ -11,6 +11,7 @@ export function useDerivSocket(symbol: string) {
   const [currentTick, setCurrentTick] = useState<number | null>(null);
   const [marketStatus, setMarketStatus] = useState<string>('Connecting...');
   const [digitHistory, setDigitHistory] = useState<number[]>([]);
+  const [priceHistory, setPriceHistory] = useState<number[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -24,6 +25,8 @@ export function useDerivSocket(symbol: string) {
 
     // 1. Fetch history first so it populates instantly without waiting for live ticks
     setDigitHistory([]);
+    setPriceHistory([]);
+    setCurrentTick(null);
     derivService.send({
       ticks_history: symbol,
       adjust_start_time: 1,
@@ -33,8 +36,10 @@ export function useDerivSocket(symbol: string) {
       style: 'ticks'
     }).then((res) => {
       if (isMounted && res && res.history && res.history.prices) {
-        const historicalDigits = res.history.prices.map((price: number) => getLastDigit(price, res.history.pip_size || res.pip_size));
+        const prices = res.history.prices.map(Number).filter(Number.isFinite);
+        const historicalDigits = prices.map((price: number) => getLastDigit(price, res.history.pip_size || res.pip_size));
         setDigitHistory(historicalDigits);
+        setPriceHistory((current) => [...prices, ...current].slice(-100));
       }
     }).catch((err) => {
       if (isMounted) setMarketStatus('Market unavailable');
@@ -52,6 +57,7 @@ export function useDerivSocket(symbol: string) {
           const quote = Number(data.tick.quote);
           if (!isNaN(quote)) {
             setCurrentTick(quote);
+            setPriceHistory((prev) => [...prev, quote].slice(-100));
             const lastDigit = getLastDigit(data.tick.quote, data.tick.pip_size);
             if (!isNaN(lastDigit)) {
               setDigitHistory((prev) => {
@@ -90,5 +96,5 @@ export function useDerivSocket(symbol: string) {
     };
   }, [symbol]);
 
-  return { currentTick, marketStatus, digitHistory };
+  return { currentTick, marketStatus, digitHistory, priceHistory };
 }
