@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PositionsDrawer from './components/layout/PositionsDrawer';
 import LivePriceChart from './components/trading/LivePriceChart';
-import { useDerivSocket } from './hooks/useDerivSocket';
+import { getLastDigit, useDerivSocket } from './hooks/useDerivSocket';
 import { derivService } from './services/derivSocket';
 import { fetchOptionsAccounts, requestAccountWebSocketUrl, pickPrimaryAccount, type DerivOptionsAccount } from './services/derivAccounts';
 import { scanMarket, recommendBot, type MarketType } from './lib/botRegistry';
@@ -562,11 +562,10 @@ export default function App() {
     setIsSearchingSignals(true);
     derivService.send({ ticks_history: signalMarket, adjust_start_time: 1, count: 120, end: 'latest', start: 1, style: 'ticks' }).then((response) => {
       if (!isMounted || !response?.history?.prices?.length) return;
-      const pipSize = response.history.pip_size || response.pip_size || 2;
+      const pipSize = response.history.pip_size ?? response.pip_size ?? 2;
       const counts = digitStatsPlaceholder();
       response.history.prices.forEach((price: number) => {
-        const formatted = Number(price).toFixed(pipSize);
-        const digit = Number(formatted.charAt(formatted.length - 1));
+        const digit = getLastDigit(price, pipSize);
         if (counts[digit]) counts[digit].count += 1;
       });
       const total = response.history.prices.length;
@@ -641,9 +640,7 @@ export default function App() {
 
   const minPct = Math.min(...digitStats.map(s => s.pct));
   const maxPct = Math.max(...digitStats.map(s => s.pct));
-  const lastDigit = currentTick !== null && !isNaN(currentTick) 
-    ? parseInt(currentTick.toString().slice(-1), 10) 
-    : 3;
+  const lastDigit = digitHistory.at(-1) ?? 3;
 
   const handleLoadStrategyToWorkspace = () => {
     if (!selectedStrategy) return;
@@ -915,6 +912,7 @@ export default function App() {
         status?: string;
         tick_count?: number | string;
         current_spot?: number | string;
+        current_spot_display_value?: string;
         bid_price?: number | string;
         payout?: number | string;
         buy_price?: number | string;
@@ -926,8 +924,8 @@ export default function App() {
 
       const contractId = String(contract.contract_id);
       const ticksElapsed = normalizeBalance(contract.tick_count);
-      const currentSpot = normalizeBalance(contract.current_spot);
-      const lastDigit = currentSpot === null ? undefined : Number(currentSpot.toFixed(2).slice(-1));
+      const spotForLastDigit = contract.current_spot_display_value ?? contract.current_spot;
+      const lastDigit = spotForLastDigit == null ? undefined : getLastDigit(spotForLastDigit);
       const contractValue = normalizeBalance(contract.bid_price);
       const payout = normalizeBalance(contract.payout) ?? 0;
       const buyPrice = normalizeBalance(contract.buy_price) ?? 0;
@@ -1260,8 +1258,8 @@ export default function App() {
               </div>
             </div>
 
-            <div className="relative order-1 flex min-h-[160px] flex-none items-center justify-center rounded-[28px] border border-[#202a35] bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.10),_transparent_40%),linear-gradient(180deg,#151d24_0%,#10171d_100%)] p-3 sm:p-6 md:order-none md:min-h-0 md:flex-1">
-              <div className="grid w-full max-w-2xl grid-cols-5 gap-1.5 sm:gap-2 md:gap-3">
+            <div className="relative order-1 flex min-h-[84px] flex-none items-center justify-center rounded-[28px] border border-[#202a35] bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.10),_transparent_40%),linear-gradient(180deg,#151d24_0%,#10171d_100%)] p-2 sm:p-6 md:order-none md:min-h-0 md:flex-1">
+              <div className="grid w-full grid-cols-10 gap-1 sm:gap-1.5 md:gap-2">
                 {digitStats.map((item) => {
                   const isSelected = selectedDigit === item.digit;
                   const isCurrent = lastDigit === item.digit;
@@ -1277,7 +1275,7 @@ export default function App() {
                     <button
                       key={item.digit}
                       onClick={() => setSelectedDigit(item.digit)}
-                      className={`relative flex h-[clamp(2.4rem,12vw,4.5rem)] w-[clamp(2.4rem,12vw,4.5rem)] cursor-pointer flex-col items-center justify-center rounded-full border transition-all ${
+                      className={`relative flex aspect-square w-full max-w-[4.5rem] cursor-pointer flex-col items-center justify-center rounded-full border transition-all ${
                         isSelected ? 'border-2 border-white bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.22)]' : isLowest ? 'border border-rose-400/70 bg-rose-500/20 hover:border-rose-300' : isHighest ? 'border border-emerald-400/70 bg-emerald-500/20 hover:border-emerald-300' : 'border border-[#2c3943] bg-[#111b22] hover:border-slate-400'
                       }`}
                     >
@@ -1290,8 +1288,8 @@ export default function App() {
                           strokeLinecap="round" fill="transparent" className="transition-all duration-500"
                         />
                       </svg>
-                      <span className={`relative z-10 text-base font-black sm:text-xl ${isSelected ? 'text-slate-950' : 'text-white'}`}>{item.digit}</span>
-                      <span className={`relative z-10 text-[8px] font-bold ${isSelected ? 'text-slate-700' : isLowest ? 'text-rose-300' : isHighest ? 'text-emerald-300' : 'text-slate-400'}`}>
+                      <span className={`relative z-10 text-xs font-black sm:text-xl ${isSelected ? 'text-slate-950' : 'text-white'}`}>{item.digit}</span>
+                      <span className={`relative z-10 text-[7px] font-bold sm:text-[8px] ${isSelected ? 'text-slate-700' : isLowest ? 'text-rose-300' : isHighest ? 'text-emerald-300' : 'text-slate-400'}`}>
                         {item.pct}%
                       </span>
                       {isCurrent && <span className="absolute -bottom-1.5 z-20 h-2.5 w-2.5 rounded-full bg-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.8)]" />}
@@ -1345,7 +1343,7 @@ export default function App() {
               </div>
 
               {isDigitMode ? (
-                <div className="grid grid-cols-5 gap-1.5 rounded-2xl border border-[#1d2a33] bg-[#111b22] p-2">
+                <div className="grid grid-cols-10 gap-1 rounded-2xl border border-[#1d2a33] bg-[#111b22] p-2">
                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
                     <button
                       key={d}

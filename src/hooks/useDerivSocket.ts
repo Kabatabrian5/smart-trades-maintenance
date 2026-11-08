@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
 import { derivService } from '../services/derivSocket';
 
-function getLastDigit(price: number | string, pipSize = 2) {
-  const decimals = Number.isInteger(pipSize) && pipSize > 0 ? pipSize : 2;
-  const formattedPrice = Number(price).toFixed(decimals);
-  return Number(formattedPrice.charAt(formattedPrice.length - 1));
+export function getLastDigit(price: number | string, pipSize?: number) {
+  const displayedDecimals = typeof price === 'string' && price.includes('.')
+    ? price.split('.').at(-1)?.length ?? 0
+    : 0;
+  const decimals = Number.isInteger(pipSize) && pipSize !== undefined && pipSize >= 0
+    ? pipSize
+    : displayedDecimals || 2;
+  const numericPrice = Number(price);
+  if (!Number.isFinite(numericPrice)) return NaN;
+  const formattedPrice = numericPrice.toFixed(decimals);
+  return Number(formattedPrice.at(-1));
 }
 
 export function useDerivSocket(symbol: string) {
@@ -37,7 +44,7 @@ export function useDerivSocket(symbol: string) {
     }).then((res) => {
       if (isMounted && res && res.history && res.history.prices) {
         const prices = res.history.prices.map(Number).filter(Number.isFinite);
-        const historicalDigits = prices.map((price: number) => getLastDigit(price, res.history.pip_size || res.pip_size));
+        const historicalDigits = prices.map((price: number) => getLastDigit(price, res.history.pip_size ?? res.pip_size));
         setDigitHistory(historicalDigits);
         setPriceHistory((current) => [...prices, ...current].slice(-100));
       }

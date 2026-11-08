@@ -61,16 +61,10 @@
     color: #18232b !important;
   }
 
-  .theme-light [class*="bg-[#121217"],
-  .theme-light [class*="bg-[#16161c"],
-  .theme-light [class*="bg-[#17171f"],
-  .theme-light [class*="bg-[#1b1b24"],
-  .theme-light [class*="bg-[#181820"],
-  .theme-light [class*="bg-[#111217"],
-  .theme-light [class*="bg-[#222230"],
-  .theme-light [class*="bg-[#252533"],
-  .theme-light [class*="bg-[#1a1a22"] {
+  .theme-light [class*="bg-[#"],
+  .theme-light [class*="bg-[radial-gradient"] {
     background-color: #f7fafb !important;
+    background-image: none !important;
     color: #18232b !important;
   }
 
@@ -81,6 +75,26 @@
   .theme-light [class*="text-gray-500"],
   .theme-light [class*="text-gray-600"] {
     color: #34444d !important;
+  }
+
+  .theme-light [class*="text-slate-"] {
+    color: #53656e !important;
+  }
+
+  .theme-light [class*="text-emerald-"] {
+    color: #087f5b !important;
+  }
+
+  .theme-light [class*="text-rose-"] {
+    color: #c24155 !important;
+  }
+
+  .theme-light [class*="text-amber-"] {
+    color: #925a0a !important;
+  }
+
+  .theme-light [class*="text-cyan-"] {
+    color: #0e7490 !important;
   }
 
   .theme-light [class*="border-[#"],
@@ -102,5 +116,37 @@
   .theme-light [class*="bg-rose-600"] {
     background-color: #d94b62 !important;
     color: #ffffff !important;
+  }
+
+  .theme-light .live-price-chart [class*="text-slate-"] {
+    color: #53656e !important;
+  }
+
+  .theme-light .live-price-chart [class*="text-emerald-"] {
+    color: #087f5b !important;
+  }
+
+  .theme-light .live-price-chart [class*="text-rose-"] {
+    color: #c24155 !important;
+  }
+
+  .theme-light .live-price-chart [role="group"] {
+    background-color: #f0f4f6;
+  }
+
+  .theme-light .live-price-chart [role="group"] button {
+    color: #263640 !important;
+  }
+
+  .theme-light .live-price-chart [role="group"] button:hover {
+    background-color: #e1e9ed !important;
+  }
+
+  .theme-light .live-price-chart [role="group"] span {
+    background-color: #d7e0e4;
+  }
+
+  .theme-light .live-price-chart svg line {
+    stroke: #d7e0e4;
   }
 }
