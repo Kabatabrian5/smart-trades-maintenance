@@ -16,6 +16,8 @@ class DerivSocketService {
   private requestQueue: any[] = [];
   public onConnectionChange?: (status: string) => void;
   private currentUrl: string = PUBLIC_WS_URL;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectDelay = 1000;
 
   constructor() {
     this.connect();
@@ -27,9 +29,16 @@ class DerivSocketService {
    * connection itself via the OTP embedded in the URL, so no follow-up message is needed.
    */
   public connectToUrl(url: string) {
+    if (this.currentUrl === url && this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
     this.currentUrl = url;
-    this.ws?.close();
+    this.clearReconnectTimer();
+    const previousSocket = this.ws;
     this.ws = null;
+    previousSocket?.close();
+    this.rejectPendingRequests(new Error('Deriv WebSocket connection changed'));
     this.connect();
   }
 
@@ -40,15 +49,20 @@ class DerivSocketService {
 
   public connect() {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      if (this.ws.readyState === WebSocket.OPEN) this.onConnectionChange?.('Live');
       return;
     }
 
+    this.clearReconnectTimer();
     if (this.onConnectionChange) this.onConnectionChange('Connecting...');
 
     try {
-      this.ws = new WebSocket(this.currentUrl);
+      const socket = new WebSocket(this.currentUrl);
+      this.ws = socket;
 
-      this.ws.onopen = () => {
+      socket.onopen = () => {
+        if (this.ws !== socket) return;
+        this.reconnectDelay = 1000;
         if (this.onConnectionChange) this.onConnectionChange('Live');
 
         while (this.requestQueue.length > 0) {
@@ -57,7 +71,8 @@ class DerivSocketService {
         }
       };
 
-      this.ws.onmessage = (event) => {
+      socket.onmessage = (event) => {
+        if (this.ws !== socket) return;
         const data = JSON.parse(event.data);
 
         if (data.req_id && this.pendingRequests.has(data.req_id.toString())) {
@@ -76,15 +91,21 @@ class DerivSocketService {
         }
       };
 
-      this.ws.onerror = () => {
+      socket.onerror = () => {
+        if (this.ws !== socket) return;
         if (this.onConnectionChange) this.onConnectionChange('Connection error');
       };
 
-      this.ws.onclose = () => {
+      socket.onclose = () => {
+        if (this.ws !== socket) return;
+        this.ws = null;
+        this.rejectPendingRequests(new Error('Deriv WebSocket disconnected'));
         if (this.onConnectionChange) this.onConnectionChange('Disconnected');
+        this.scheduleReconnect();
       };
     } catch (e) {
       if (this.onConnectionChange) this.onConnectionChange('Connection error');
+      this.scheduleReconnect();
     }
   }
 
@@ -98,6 +119,27 @@ class DerivSocketService {
 
       this.sendDirect({ data, resolve, reject });
     });
+  }
+
+  private rejectPendingRequests(error: Error) {
+    this.pendingRequests.forEach(({ reject }) => reject(error));
+    this.pendingRequests.clear();
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer) return;
+    const delay = this.reconnectDelay;
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
+  }
+
+  private clearReconnectTimer() {
+    if (!this.reconnectTimer) return;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
   }
 
   private sendDirect({ data, resolve, reject }: { data: object; resolve: Function; reject: Function }) {
